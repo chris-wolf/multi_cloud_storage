@@ -4,24 +4,41 @@ import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:googleapis_auth/auth_io.dart';
 import 'package:path/path.dart' as p; // avoid clash with 'path' param
 import 'cloud_storage_provider.dart';
+import 'package:http/http.dart' as http;
 
 class GoogleDriveProvider extends CloudStorageProvider {
   late drive.DriveApi driveApi;
   bool _isAuthenticated = false;
-  static const List<String> _scopes = [
-    drive.DriveApi.driveFileScope,
-    drive.DriveApi.driveScope,
-  ];
 
   GoogleDriveProvider._create();
 
-  static Future<GoogleDriveProvider?> connect() async {
-    final client = await clientViaApplicationDefaultCredentials(
-      scopes: _scopes,
+  static Future<GoogleDriveProvider?> login() async {
+    final googleSignIn = GoogleSignIn(
+      scopes: [
+        CloudStorageProvider.cloudAccess == CloudAccessType.appStorage ?
+        drive.DriveApi.driveFileScope :
+        drive.DriveApi.driveScope,
+      ],
     );
 
-    final provider =  GoogleDriveProvider._create();
-    provider.driveApi = drive.DriveApi(client);
+    final account = await googleSignIn.signIn();
+    if (account == null) {
+      // user canceled
+      return null;
+    }
+
+    final authentication = await account.authentication;
+
+    final authHeaders = {
+      'Authorization': 'Bearer ${authentication.accessToken}',
+      'X-Goog-AuthUser': '0', // optional but sometimes needed for Drive multi-accounts
+    };
+
+    final authenticateClient = GoogleAuthClient(authHeaders);
+
+    final provider = GoogleDriveProvider._create();
+    provider.driveApi = drive.DriveApi(authenticateClient);
+    provider._isAuthenticated = true;
     return provider;
   }
 
@@ -236,5 +253,18 @@ class GoogleDriveProvider extends CloudStorageProvider {
       ..parents = [parentId];
 
     return await driveApi.files.create(folder);
+  }
+}
+
+
+class GoogleAuthClient extends http.BaseClient {
+  final Map<String, String> _headers;
+  final http.Client _client = http.Client();
+
+  GoogleAuthClient(this._headers);
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) {
+    return _client.send(request..headers.addAll(_headers));
   }
 }
