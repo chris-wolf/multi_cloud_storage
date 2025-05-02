@@ -1,39 +1,36 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_onedrive/flutter_onedrive.dart';
 import 'package:path/path.dart' as path;
 import 'cloud_storage_provider.dart';
 
 class OneDriveProvider implements CloudStorageProvider {
-  late FlutterOneDrive _client;
+  late OneDrive _client;
   bool _isAuthenticated = false;
   final String _clientId;
   final String _clientSecret;
   final String _redirectUri;
-  final List<String> _scopes = [
-    'Files.ReadWrite',
-    'Files.ReadWrite.All',
-    'Sites.ReadWrite.All',
-  ];
+  final BuildContext _context;
 
   OneDriveProvider({
     required String clientId,
     required String clientSecret,
     required String redirectUri,
+    required BuildContext context,
   })  : _clientId = clientId,
         _clientSecret = clientSecret,
-        _redirectUri = redirectUri;
+        _redirectUri = redirectUri,
+        _context = context;
 
   @override
   Future<void> authenticate() async {
-    _client = FlutterOneDrive(
-      clientId: _clientId,
-      clientSecret: _clientSecret,
-      redirectUri: _redirectUri,
-      scopes: _scopes,
+    _client = OneDrive(
+      clientID: _clientId,
+      redirectURL: _redirectUri,
     );
 
-    await _client.authenticate();
+    await _client.connect(_context);
     _isAuthenticated = true;
   }
 
@@ -48,15 +45,10 @@ class OneDriveProvider implements CloudStorageProvider {
     }
 
     final file = File(localPath);
-    final fileName = path.basename(localPath);
-    final remoteFilePath = path.join(remotePath, fileName);
+    final bytes = await file.readAsBytes();
+    await _client.push(bytes, remotePath);
 
-    await _client.uploadFile(
-      localPath: localPath,
-      remotePath: remoteFilePath,
-    );
-
-    return remoteFilePath;
+    return remotePath;
   }
 
   @override
@@ -68,10 +60,9 @@ class OneDriveProvider implements CloudStorageProvider {
       throw Exception('Not authenticated');
     }
 
-    await _client.downloadFile(
-      remotePath: remotePath,
-      localPath: localPath,
-    );
+    final response = await _client.pull(remotePath);
+    final file = File(localPath);
+    await file.writeAsBytes(response.bodyBytes!);
 
     return localPath;
   }
@@ -85,21 +76,9 @@ class OneDriveProvider implements CloudStorageProvider {
       throw Exception('Not authenticated');
     }
 
-    final items = await _client.listItems(path);
-
-    return items
-        .map((item) => CloudFile(
-              path: item.path,
-              name: item.name,
-              size: item.size,
-              modifiedTime: item.modifiedTime,
-              isDirectory: item.isFolder,
-              metadata: {
-                'id': item.id,
-                'type': item.type,
-              },
-            ))
-        .toList();
+    // Note: The package doesn't provide a direct list files method
+    // We'll need to implement this using the API directly
+    throw UnimplementedError('List files functionality not implemented');
   }
 
   @override
@@ -108,7 +87,9 @@ class OneDriveProvider implements CloudStorageProvider {
       throw Exception('Not authenticated');
     }
 
-    await _client.deleteItem(path);
+    // Note: The package doesn't provide a direct delete method
+    // We'll need to implement this using the API directly
+    throw UnimplementedError('Delete functionality not implemented');
   }
 
   @override
@@ -117,7 +98,9 @@ class OneDriveProvider implements CloudStorageProvider {
       throw Exception('Not authenticated');
     }
 
-    await _client.createFolder(path);
+    // Note: The package doesn't provide a direct create directory method
+    // We'll need to implement this using the API directly
+    throw UnimplementedError('Create directory functionality not implemented');
   }
 
   @override
@@ -126,18 +109,8 @@ class OneDriveProvider implements CloudStorageProvider {
       throw Exception('Not authenticated');
     }
 
-    final item = await _client.getItem(path);
-
-    return CloudFile(
-      path: item.path,
-      name: item.name,
-      size: item.size,
-      modifiedTime: item.modifiedTime,
-      isDirectory: item.isFolder,
-      metadata: {
-        'id': item.id,
-        'type': item.type,
-      },
-    );
+    // Note: The package doesn't provide a direct get metadata method
+    // We'll need to implement this using the API directly
+    throw UnimplementedError('Get metadata functionality not implemented');
   }
 }

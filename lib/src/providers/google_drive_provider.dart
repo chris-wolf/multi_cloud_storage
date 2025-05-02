@@ -14,26 +14,37 @@ class GoogleDriveProvider implements CloudStorageProvider {
     drive.DriveApi.driveScope,
   ];
 
-  GoogleDriveProvider({
+
+
+  GoogleDriveProvider._create({
     required String clientId,
     required String clientSecret,
   })  : _clientId = clientId,
         _clientSecret = clientSecret;
 
-  @override
-  Future<void> authenticate() async {
+
+  Future<GoogleDriveProvider> connect({
+    required String clientId,
+    required String clientSecret,
+  })   async {
     final client = await clientViaUserConsent(
       ClientId(_clientId, _clientSecret),
       _scopes,
-      prompt: (String url) async {
+          (String url) {
         // TODO: Implement proper OAuth2 flow with a web view or browser
         print('Please go to this URL and authorize: $url');
       },
     );
-
     _driveApi = drive.DriveApi(client);
     _isAuthenticated = true;
+    return GoogleDriveProvider._create(clientId: clientId, clientSecret: clientSecret);
   }
+
+  GoogleDriveProvider({
+    required String clientId,
+    required String clientSecret,
+  })  : _clientId = clientId,
+        _clientSecret = clientSecret;
 
   @override
   Future<String> uploadFile({

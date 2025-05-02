@@ -1,11 +1,12 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:icloud_storage_sync/icloud_storage_sync.dart';
 import 'package:path/path.dart' as path;
 import 'cloud_storage_provider.dart';
 
+import 'package:icloud_storage_sync/icloud_storage_sync.dart';
+
 class ICloudProvider implements CloudStorageProvider {
-  late ICloudStorageSync _client;
+  final icloudSyncPlugin = IcloudStorageSync();
   bool _isAuthenticated = false;
   final String _containerId;
   final String _teamId;
@@ -14,16 +15,8 @@ class ICloudProvider implements CloudStorageProvider {
     required String containerId,
     required String teamId,
   })  : _containerId = containerId,
-        _teamId = teamId;
-
-  @override
-  Future<void> authenticate() async {
-    _client = ICloudStorageSync(
-      containerId: _containerId,
-      teamId: _teamId,
-    );
-
-    await _client.authenticate();
+        _teamId = teamId {
+    // iCloud authentication is handled by the system
     _isAuthenticated = true;
   }
 
@@ -37,16 +30,13 @@ class ICloudProvider implements CloudStorageProvider {
       throw Exception('Not authenticated');
     }
 
-    final file = File(localPath);
-    final fileName = path.basename(localPath);
-    final remoteFilePath = path.join(remotePath, fileName);
-
-    await _client.uploadFile(
-      localPath: localPath,
-      remotePath: remoteFilePath,
+    await icloudSyncPlugin.upload(
+      containerId: _containerId,
+      filePath: localPath,
+      destinationRelativePath: remotePath,
     );
 
-    return remoteFilePath;
+    return remotePath;
   }
 
   @override
@@ -58,12 +48,9 @@ class ICloudProvider implements CloudStorageProvider {
       throw Exception('Not authenticated');
     }
 
-    await _client.downloadFile(
-      remotePath: remotePath,
-      localPath: localPath,
-    );
-
-    return localPath;
+    // Note: The package doesn't provide a direct download method
+    // We'll need to implement this using the API directly
+    throw UnimplementedError('Download functionality not implemented');
   }
 
   @override
@@ -75,18 +62,22 @@ class ICloudProvider implements CloudStorageProvider {
       throw Exception('Not authenticated');
     }
 
-    final items = await _client.listItems(path);
+    final items = (await icloudSyncPlugin.getCloudFiles(
+      containerId: _containerId,
+    ))
+        .where((file) => file.filePath == 'path');
 
     return items
         .map((item) => CloudFile(
-              path: item.path,
-              name: item.name,
-              size: item.size,
-              modifiedTime: item.modifiedTime,
-              isDirectory: item.isDirectory,
+              path: item.relativePath ?? '',
+              name: item.relativePath?.split('/').last ?? '',
+              size: 0, // The package doesn't provide size
+              modifiedTime:
+                  DateTime.now(), // The package doesn't provide modified time
+              isDirectory: false, // The package doesn't provide directory info
               metadata: {
-                'id': item.id,
-                'type': item.type,
+                'id': item.id ?? '',
+                'type': 'file',
               },
             ))
         .toList();
@@ -98,7 +89,10 @@ class ICloudProvider implements CloudStorageProvider {
       throw Exception('Not authenticated');
     }
 
-    await _client.deleteItem(path);
+    await icloudSyncPlugin.delete(
+      containerId: _containerId,
+      relativePath: path,
+    );
   }
 
   @override
@@ -107,7 +101,9 @@ class ICloudProvider implements CloudStorageProvider {
       throw Exception('Not authenticated');
     }
 
-    await _client.createDirectory(path);
+    // Note: The package doesn't provide a direct create directory method
+    // We'll need to implement this using the API directly
+    throw UnimplementedError('Create directory functionality not implemented');
   }
 
   @override
@@ -116,18 +112,8 @@ class ICloudProvider implements CloudStorageProvider {
       throw Exception('Not authenticated');
     }
 
-    final item = await _client.getItem(path);
-
-    return CloudFile(
-      path: item.path,
-      name: item.name,
-      size: item.size,
-      modifiedTime: item.modifiedTime,
-      isDirectory: item.isDirectory,
-      metadata: {
-        'id': item.id,
-        'type': item.type,
-      },
-    );
+    // Note: The package doesn't provide a direct get metadata method
+    // We'll need to implement this using the API directly
+    throw UnimplementedError('Get metadata functionality not implemented');
   }
 }

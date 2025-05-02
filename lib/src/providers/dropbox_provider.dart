@@ -5,13 +5,12 @@ import 'package:path/path.dart' as path;
 import 'cloud_storage_provider.dart';
 
 class DropboxProvider implements CloudStorageProvider {
-  late DropboxClient _client;
   bool _isAuthenticated = false;
-  final String _appKey;
-  final String _appSecret;
-  final String _redirectUri;
+  late String _appKey;
+  late String _appSecret;
+  late String _redirectUri;
 
-  DropboxProvider({
+  DropboxProvider._instance({
     required String appKey,
     required String appSecret,
     required String redirectUri,
@@ -19,16 +18,14 @@ class DropboxProvider implements CloudStorageProvider {
         _appSecret = appSecret,
         _redirectUri = redirectUri;
 
-  @override
-  Future<void> authenticate() async {
-    _client = DropboxClient(
-      appKey: _appKey,
-      appSecret: _appSecret,
-      redirectUri: _redirectUri,
-    );
-
-    await _client.authenticate();
+  Future<DropboxProvider> connect(
+      {required String appKey,
+      required String appSecret,
+      required String redirectUri}) async {
+    await Dropbox.init(_appKey, _appKey, _appSecret);
+    await Dropbox.authorize();
     _isAuthenticated = true;
+    return DropboxProvider._instance(appKey: appKey, appSecret: appSecret, redirectUri: redirectUri);
   }
 
   @override
@@ -41,17 +38,11 @@ class DropboxProvider implements CloudStorageProvider {
       throw Exception('Not authenticated');
     }
 
-    final file = File(localPath);
-    final fileName = path.basename(localPath);
-    final remoteFilePath = path.join(remotePath, fileName);
+    await Dropbox.upload(localPath, remotePath, (uploaded, total) {
+      debugPrint('Upload progress: $uploaded / $total');
+    });
 
-    await _client.files.upload(
-      remoteFilePath,
-      file.readAsBytesSync(),
-      mode: WriteMode.overwrite,
-    );
-
-    return remoteFilePath;
+    return remotePath;
   }
 
   @override
@@ -63,9 +54,9 @@ class DropboxProvider implements CloudStorageProvider {
       throw Exception('Not authenticated');
     }
 
-    final file = File(localPath);
-    final response = await _client.files.download(remotePath);
-    await file.writeAsBytes(response);
+    await Dropbox.download(remotePath, localPath, (downloaded, total) {
+      debugPrint('Download progress: $downloaded / $total');
+    });
 
     return localPath;
   }
@@ -79,24 +70,24 @@ class DropboxProvider implements CloudStorageProvider {
       throw Exception('Not authenticated');
     }
 
-    final result = await _client.files.listFolder(
-      path,
-      recursive: recursive,
-    );
+    final result = await Dropbox.listFolder(path);
+    final List<dynamic> entries = result['entries'] ?? [];
 
-    return result.entries
-        .map((entry) => CloudFile(
-              path: entry.pathDisplay!,
-              name: entry.name!,
-              size: entry.size ?? 0,
-              modifiedTime: DateTime.parse(entry.serverModified!),
-              isDirectory: entry is FolderMetadata,
-              metadata: {
-                'id': entry.id,
-                'tag': entry.tag,
-              },
-            ))
-        .toList();
+    return entries.map((entry) {
+      final isFolder = entry['.tag'] == 'folder';
+      return CloudFile(
+        path: entry['path_display'] ?? '',
+        name: entry['name'] ?? '',
+        size: entry['size'] ?? 0,
+        modifiedTime: DateTime.parse(
+            entry['server_modified'] ?? DateTime.now().toIso8601String()),
+        isDirectory: isFolder,
+        metadata: {
+          'id': entry['id'],
+          'tag': entry['.tag'],
+        },
+      );
+    }).toList();
   }
 
   @override
@@ -105,7 +96,9 @@ class DropboxProvider implements CloudStorageProvider {
       throw Exception('Not authenticated');
     }
 
-    await _client.files.delete(path);
+    // Note: The delete method is not directly exposed in the package
+    // We'll need to implement this using the API directly
+    throw UnimplementedError('Delete functionality not implemented');
   }
 
   @override
@@ -114,7 +107,9 @@ class DropboxProvider implements CloudStorageProvider {
       throw Exception('Not authenticated');
     }
 
-    await _client.files.createFolder(path);
+    // Note: The createFolder method is not directly exposed in the package
+    // We'll need to implement this using the API directly
+    throw UnimplementedError('Create directory functionality not implemented');
   }
 
   @override
@@ -123,18 +118,8 @@ class DropboxProvider implements CloudStorageProvider {
       throw Exception('Not authenticated');
     }
 
-    final metadata = await _client.files.getMetadata(path);
-
-    return CloudFile(
-      path: metadata.pathDisplay!,
-      name: metadata.name!,
-      size: metadata.size ?? 0,
-      modifiedTime: DateTime.parse(metadata.serverModified!),
-      isDirectory: metadata is FolderMetadata,
-      metadata: {
-        'id': metadata.id,
-        'tag': metadata.tag,
-      },
-    );
+    // Note: The getMetadata method is not directly exposed in the package
+    // We'll need to implement this using the API directly
+    throw UnimplementedError('Get metadata functionality not implemented');
   }
 }
