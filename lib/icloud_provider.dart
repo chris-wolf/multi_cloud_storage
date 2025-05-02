@@ -5,20 +5,23 @@ import 'cloud_storage_provider.dart';
 
 import 'package:icloud_storage_sync/icloud_storage_sync.dart';
 
-class ICloudProvider implements CloudStorageProvider {
+class ICloudProvider extends CloudStorageProvider {
   final icloudSyncPlugin = IcloudStorageSync();
   bool _isAuthenticated = false;
   final String _containerId;
-  final String _teamId;
 
-  ICloudProvider({
+  ICloudProvider.create({
     required String containerId,
-    required String teamId,
-  })  : _containerId = containerId,
-        _teamId = teamId {
-    // iCloud authentication is handled by the system
-    _isAuthenticated = true;
+  })  : _containerId = containerId;
+
+static  Future<ICloudProvider> connect({
+    required String containerId,
+  }) async {
+    // If this succeeds, we assume the user has access
+    return ICloudProvider.create(containerId: containerId,);
   }
+
+
 
   @override
   Future<String> uploadFile({

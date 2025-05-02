@@ -4,7 +4,7 @@ import 'package:dropbox_client/dropbox_client.dart';
 import 'package:path/path.dart' as path;
 import 'cloud_storage_provider.dart';
 
-class DropboxProvider implements CloudStorageProvider {
+class DropboxProvider extends CloudStorageProvider {
   bool _isAuthenticated = false;
   late String _appKey;
   late String _appSecret;
@@ -18,13 +18,12 @@ class DropboxProvider implements CloudStorageProvider {
         _appSecret = appSecret,
         _redirectUri = redirectUri;
 
-  Future<DropboxProvider> connect(
+  static Future<DropboxProvider> connect(
       {required String appKey,
       required String appSecret,
       required String redirectUri}) async {
-    await Dropbox.init(_appKey, _appKey, _appSecret);
-    await Dropbox.authorize();
-    _isAuthenticated = true;
+    await Dropbox.init(appKey, appKey, appSecret);
+    await Dropbox.authorizePKCE();
     return DropboxProvider._instance(appKey: appKey, appSecret: appSecret, redirectUri: redirectUri);
   }
 

@@ -1,36 +1,28 @@
 import 'dart:io';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:googleapis_auth/auth_io.dart';
 import 'package:path/path.dart' as p; // avoid clash with 'path' param
 import 'cloud_storage_provider.dart';
 
-class GoogleDriveProvider implements CloudStorageProvider {
-  late drive.DriveApi _driveApi;
+class GoogleDriveProvider extends CloudStorageProvider {
+  late drive.DriveApi driveApi;
   bool _isAuthenticated = false;
-  final String _clientId;
-  final String _clientSecret;
   static const List<String> _scopes = [
     drive.DriveApi.driveFileScope,
     drive.DriveApi.driveScope,
   ];
 
-  GoogleDriveProvider({
-    required String clientId,
-    required String clientSecret,
-  })  : _clientId = clientId,
-        _clientSecret = clientSecret;
+  GoogleDriveProvider._create();
 
-  Future<void> connect() async {
-    final client = await clientViaUserConsent(
-      ClientId(_clientId, _clientSecret),
-      _scopes,
-          (url) {
-        // You should open a webview or external browser here
-        print('Please go to this URL and authorize: $url');
-      },
+  static Future<GoogleDriveProvider?> connect() async {
+    final client = await clientViaApplicationDefaultCredentials(
+      scopes: _scopes,
     );
-    _driveApi = drive.DriveApi(client);
-    _isAuthenticated = true;
+
+    final provider =  GoogleDriveProvider._create();
+    provider.driveApi = drive.DriveApi(client);
+    return provider;
   }
 
   void _checkAuth() {
@@ -38,6 +30,12 @@ class GoogleDriveProvider implements CloudStorageProvider {
       throw Exception('Not authenticated');
     }
   }
+
+  static final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: [
+      'https://www.googleapis.com/auth/drive.file', // or 'drive' for full access
+    ],
+  );
 
   @override
   Future<String> uploadFile({
@@ -56,7 +54,7 @@ class GoogleDriveProvider implements CloudStorageProvider {
       ..parents = [folder.id!];
 
     final media = drive.Media(file.openRead(), await file.length());
-    final uploadedFile = await _driveApi.files.create(driveFile, uploadMedia: media);
+    final uploadedFile = await driveApi.files.create(driveFile, uploadMedia: media);
 
     return uploadedFile.id!;
   }
@@ -76,7 +74,7 @@ class GoogleDriveProvider implements CloudStorageProvider {
     final output = File(localPath);
     final sink = output.openWrite();
 
-    final mediaStream = await _driveApi.files.get(
+    final mediaStream = await driveApi.files.get(
       file.id!,
       downloadOptions: drive.DownloadOptions.fullMedia,
     );
@@ -102,7 +100,7 @@ class GoogleDriveProvider implements CloudStorageProvider {
     final folder = await _getFolderByPath(path);
     if (folder == null) return [];
 
-    final files = await _driveApi.files.list(
+    final files = await driveApi.files.list(
       q: "'${folder.id}' in parents",
       $fields: 'files(id, name, size, modifiedTime, mimeType)',
     );
@@ -148,7 +146,7 @@ class GoogleDriveProvider implements CloudStorageProvider {
 
     final file = await _getFileByPath(path);
     if (file != null) {
-      await _driveApi.files.delete(file.id!);
+      await driveApi.files.delete(file.id!);
     }
   }
 
@@ -193,7 +191,7 @@ class GoogleDriveProvider implements CloudStorageProvider {
     }
 
     final fileName = parts.last;
-    final files = await _driveApi.files.list(
+    final files = await driveApi.files.list(
       q: "'${currentFolder.id}' in parents and name = '$fileName' and trashed = false",
       $fields: 'files(id, name, size, modifiedTime, mimeType)',
     );
@@ -224,7 +222,7 @@ class GoogleDriveProvider implements CloudStorageProvider {
   }
 
   Future<drive.File?> _getFolderByName(String parentId, String name) async {
-    final files = await _driveApi.files.list(
+    final files = await driveApi.files.list(
       q: "'$parentId' in parents and name = '$name' and mimeType = 'application/vnd.google-apps.folder' and trashed = false",
       $fields: 'files(id, name)',
     );
@@ -237,6 +235,6 @@ class GoogleDriveProvider implements CloudStorageProvider {
       ..mimeType = 'application/vnd.google-apps.folder'
       ..parents = [parentId];
 
-    return await _driveApi.files.create(folder);
+    return await driveApi.files.create(folder);
   }
 }

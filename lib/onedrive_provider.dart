@@ -5,33 +5,38 @@ import 'package:flutter_onedrive/flutter_onedrive.dart';
 import 'package:path/path.dart' as path;
 import 'cloud_storage_provider.dart';
 
-class OneDriveProvider implements CloudStorageProvider {
-  late OneDrive _client;
+class OneDriveProvider extends CloudStorageProvider {
+  late OneDrive client;
   bool _isAuthenticated = false;
-  final String _clientId;
-  final String _clientSecret;
+  final String clientId;
+  final String clientSecret;
   final String _redirectUri;
   final BuildContext _context;
 
-  OneDriveProvider({
+  OneDriveProvider._create({
     required String clientId,
     required String clientSecret,
     required String redirectUri,
     required BuildContext context,
-  })  : _clientId = clientId,
-        _clientSecret = clientSecret,
+  })  : clientId = clientId,
+        clientSecret = clientSecret,
         _redirectUri = redirectUri,
         _context = context;
 
-  @override
-  Future<void> authenticate() async {
-    _client = OneDrive(
-      clientID: _clientId,
-      redirectURL: _redirectUri,
+   static Future<OneDriveProvider> connect({
+    required String clientId,
+    required String clientSecret,
+    required String redirectUri,
+    required BuildContext context,
+  }) async {
+     final provider = OneDriveProvider._create(clientId: clientId, clientSecret: clientSecret, redirectUri: redirectUri, context: context);
+     provider.client = OneDrive(
+      clientID: clientId,
+      redirectURL: redirectUri,
     );
 
-    await _client.connect(_context);
-    _isAuthenticated = true;
+    await provider.client.connect(context);
+    return provider;
   }
 
   @override
@@ -46,7 +51,7 @@ class OneDriveProvider implements CloudStorageProvider {
 
     final file = File(localPath);
     final bytes = await file.readAsBytes();
-    await _client.push(bytes, remotePath);
+    await client.push(bytes, remotePath);
 
     return remotePath;
   }
@@ -60,7 +65,7 @@ class OneDriveProvider implements CloudStorageProvider {
       throw Exception('Not authenticated');
     }
 
-    final response = await _client.pull(remotePath);
+    final response = await client.pull(remotePath);
     final file = File(localPath);
     await file.writeAsBytes(response.bodyBytes!);
 

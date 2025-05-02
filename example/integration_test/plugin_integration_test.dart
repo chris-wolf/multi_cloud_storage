@@ -10,13 +10,11 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
-import 'package:multi_cloud_storage/multi_cloud_storage.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('getPlatformVersion test', (WidgetTester tester) async {
-    final MultiCloudStorage plugin = MultiCloudStorage();
     // The version string depends on the host platform running the test, so
     // just assert that some non-empty string is returned.
   });
