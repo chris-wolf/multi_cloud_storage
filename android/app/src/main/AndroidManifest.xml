@@ -20,17 +20,6 @@
             </intent-filter>
         </activity>
 
-        <!-- Add Dropbox Auth Activity -->
-        <activity
-            android:name="com.dropbox.core.android.AuthActivity"
-            android:launchMode="singleTask">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="db-u7rt606k8ti1ygu" />
-            </intent-filter>
-        </activity>
 
         <meta-data
             android:name="flutterEmbedding"
