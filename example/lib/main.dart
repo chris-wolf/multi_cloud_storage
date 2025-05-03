@@ -59,12 +59,15 @@ class _CloudStorageExampleState extends State<CloudStorageExample> {
                     child: Text('Dropbox'),
                   ),
                   ElevatedButton(
-                    onPressed: () {
-                      OneDriveProvider.connect(
-                          clientId: '7e4acdbb-4fb2-4964-85d7-d38c176ff5f9',
-                          redirectUri: '',
+                    onPressed: () async  {
+                      final provider = await OneDriveProvider.connect(
+                          clientId: '474a6523-7bc2-420c-90d3-f355d9c82011',
+                          redirectUri: 'https://login.microsoftonline.com/common/oauth2/nativeclient',
                           clientSecret: '',
                           context: context);
+                      if (provider != null) {
+                        openExplorer(context, provider);
+                      }
                     },
                     child: Text('Onedrive'),
                   ),

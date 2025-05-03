@@ -23,7 +23,7 @@ class OneDriveProvider extends CloudStorageProvider {
         _redirectUri = redirectUri,
         _context = context;
 
-   static Future<OneDriveProvider> connect({
+   static Future<OneDriveProvider?> connect({
     required String clientId,
     required String clientSecret,
     required String redirectUri,
@@ -34,8 +34,11 @@ class OneDriveProvider extends CloudStorageProvider {
       clientID: clientId,
       redirectURL: redirectUri,
     );
-
-    await provider.client.connect(context);
+    final success = await provider.client.connect(context);
+    if (success == false) {
+      return null;
+    }
+    provider._isAuthenticated = true;
     return provider;
   }
 
