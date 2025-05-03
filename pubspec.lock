@@ -177,10 +177,9 @@ packages:
   flutter_onedrive:
     dependency: "direct main"
     description:
-      name: flutter_onedrive
-      sha256: d3acb8304257b61c5542c3e9e7daedc0ab5a028f689c5ec93fc9b734ad57eb37
-      url: "https://pub.dev"
-    source: hosted
+      path: "../flutter_onedrive"
+      relative: true
+    source: path
     version: "1.7.0"
   flutter_secure_storage:
     dependency: transitive

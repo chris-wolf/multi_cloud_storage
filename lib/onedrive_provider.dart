@@ -51,11 +51,9 @@ class OneDriveProvider extends CloudStorageProvider {
     if (!_isAuthenticated) {
       throw Exception('Not authenticated');
     }
-
     final file = File(localPath);
     final bytes = await file.readAsBytes();
-    await client.push(bytes, remotePath);
-
+    await client.push(bytes, remotePath, isAppFolder: CloudStorageProvider.cloudAccess == CloudAccessType.appStorage);
     return remotePath;
   }
 
@@ -68,7 +66,7 @@ class OneDriveProvider extends CloudStorageProvider {
       throw Exception('Not authenticated');
     }
 
-    final response = await client.pull(remotePath);
+    final response = await client.pull(remotePath,  isAppFolder: CloudStorageProvider.cloudAccess == CloudAccessType.appStorage);
     final file = File(localPath);
     await file.writeAsBytes(response.bodyBytes!);
 
@@ -83,21 +81,19 @@ class OneDriveProvider extends CloudStorageProvider {
     if (!_isAuthenticated) {
       throw Exception('Not authenticated');
     }
-
-    // Note: The package doesn't provide a direct list files method
-    // We'll need to implement this using the API directly
-    throw UnimplementedError('List files functionality not implemented');
+    return (await client.listFiles(
+      path: path,
+      recursive: recursive,
+        isAppFolder: CloudStorageProvider.cloudAccess == CloudAccessType.appStorage
+    )).map((dropboxFile) => CloudFile(path: dropboxFile.path, name: dropboxFile.name, size: dropboxFile.size, modifiedTime: DateTime.fromMillisecondsSinceEpoch(0), isDirectory: dropboxFile.isFolder)).toList();
   }
 
   @override
   Future<void> deleteFile(String path) async {
-    if (!_isAuthenticated) {
-      throw Exception('Not authenticated');
-    }
-
-    // Note: The package doesn't provide a direct delete method
-    // We'll need to implement this using the API directly
-    throw UnimplementedError('Delete functionality not implemented');
+    await client.deleteFile(
+      path,
+        isAppFolder: CloudStorageProvider.cloudAccess == CloudAccessType.appStorage
+    );
   }
 
   @override
@@ -106,9 +102,10 @@ class OneDriveProvider extends CloudStorageProvider {
       throw Exception('Not authenticated');
     }
 
-    // Note: The package doesn't provide a direct create directory method
-    // We'll need to implement this using the API directly
-    throw UnimplementedError('Create directory functionality not implemented');
+    await client.createDirectory(
+      path,
+      isAppFolder: CloudStorageProvider.cloudAccess == CloudAccessType.appStorage
+    );
   }
 
   @override

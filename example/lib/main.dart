@@ -20,11 +20,6 @@ class CloudStorageExample extends StatefulWidget {
   State<CloudStorageExample> createState() => _CloudStorageExampleState();
 }
 
-enum CloudAccess {
-  appStorage,
-  fullAccess
-}
-
 class _CloudStorageExampleState extends State<CloudStorageExample> {
 
   CloudStorageProvider? cloudStorageProvider;
