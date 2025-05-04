@@ -180,7 +180,7 @@ packages:
       path: "../flutter_onedrive"
       relative: true
     source: path
-    version: "1.7.0"
+    version: "1.8.0"
   flutter_secure_storage:
     dependency: transitive
     description:

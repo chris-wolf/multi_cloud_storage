@@ -1,7 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
-
-import 'package:flutter/services.dart';
 import 'package:multi_cloud_storage/cloud_storage_provider.dart';
 import 'package:multi_cloud_storage/dropbox_provider.dart';
 import 'package:multi_cloud_storage/google_drive_provider.dart';

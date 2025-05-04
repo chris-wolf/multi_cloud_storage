@@ -1,7 +1,5 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:dropbox_client/dropbox_client.dart';
-import 'package:path/path.dart' as path;
 import 'cloud_storage_provider.dart';
 
 class DropboxProvider extends CloudStorageProvider {
@@ -29,7 +27,6 @@ class DropboxProvider extends CloudStorageProvider {
     } else {
       await Dropbox.authorizeWithAccessToken(accessToken);
     }
-   // await Dropbox.authorizePKCE();
     return DropboxProvider._instance(appKey: appKey, appSecret: appSecret, redirectUri: redirectUri).._isAuthenticated = true;
   }
 

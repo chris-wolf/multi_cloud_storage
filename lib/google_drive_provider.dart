@@ -1,8 +1,7 @@
 import 'dart:io';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
-import 'package:googleapis_auth/auth_io.dart';
-import 'package:path/path.dart' as p; // avoid clash with 'path' param
+import 'package:path/path.dart';
 import 'cloud_storage_provider.dart';
 import 'package:http/http.dart' as http;
 
@@ -63,8 +62,8 @@ class GoogleDriveProvider extends CloudStorageProvider {
     _checkAuth();
 
     final file = File(localPath);
-    final fileName = p.basename(remotePath);
-    final folder = await _getOrCreateFolder(p.dirname(remotePath));
+    final fileName = basename(remotePath);
+    final folder = await _getOrCreateFolder(dirname(remotePath));
 
     final driveFile = drive.File()
       ..name = fileName
@@ -124,7 +123,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
 
     return files.files?.map((file) {
       return CloudFile(
-        path: p.join(path, file.name ?? ''),
+        path: join(path, file.name ?? ''),
         name: file.name ?? '',
         size: int.tryParse(file.size ?? '0') ?? 0,
         modifiedTime: file.modifiedTime != null
@@ -141,7 +140,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
   }
 
   Future<drive.File?> _getFolderByPath(String folderPath) async {
-    final parts = p.split(folderPath);
+    final parts = split(folderPath);
     drive.File currentFolder = await _getRootFolder();
 
     for (final part in parts) {
@@ -198,7 +197,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
   }
 
   Future<drive.File?> _getFileByPath(String filePath) async {
-    final parts = p.split(filePath);
+    final parts = split(filePath);
     drive.File currentFolder = await _getRootFolder();
 
     for (var i = 0; i < parts.length - 1; i++) {
@@ -217,7 +216,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
   }
 
   Future<drive.File> _getOrCreateFolder(String folderPath) async {
-    final parts = p.split(folderPath);
+    final parts = split(folderPath);
     drive.File currentFolder = await _getRootFolder();
 
     for (final part in parts) {

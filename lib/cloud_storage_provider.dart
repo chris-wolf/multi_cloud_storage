@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-
 /// Abstract class defining the interface for cloud storage providers.
 abstract class CloudStorageProvider {
   static CloudAccessType cloudAccess = CloudAccessType.appStorage;
