@@ -11,7 +11,7 @@ dependencies:
   flutter:
     sdk: flutter
   googleapis: ^14.0.0
-  googleapis_auth: ^1.4.1
+  googleapis_auth: ^2.0.0
   dropbox_client: ^1.1.2
   flutter_onedrive:
     path: ../flutter_onedrive

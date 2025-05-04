@@ -69,10 +69,10 @@ packages:
     dependency: "direct main"
     description:
       name: dropbox_client
-      sha256: f219920c91d55a02e81ccf161813a4ac87343b25ff28eef8d6ad3bd36beb1a70
+      sha256: "6481ddd5ca783adfdc128a48ec64bb9f4d743c6087710e05238dcfb9f39d2d56"
       url: "https://pub.dev"
     source: hosted
-    version: "1.1.2"
+    version: "1.2.0"
   fake_async:
     dependency: transitive
     description:
@@ -299,10 +299,10 @@ packages:
     dependency: "direct main"
     description:
       name: googleapis_auth
-      sha256: befd71383a955535060acde8792e7efc11d2fccd03dd1d3ec434e85b68775938
+      sha256: b81fe352cc4a330b3710d2b7ad258d9bcef6f909bb759b306bf42973a7d046db
       url: "https://pub.dev"
     source: hosted
-    version: "1.6.0"
+    version: "2.0.0"
   http:
     dependency: "direct overridden"
     description:

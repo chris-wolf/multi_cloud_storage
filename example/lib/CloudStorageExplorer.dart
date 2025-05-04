@@ -194,7 +194,7 @@ class _CloudStorageExplorerPageState extends State<CloudStorageExplorerPage> {
           return ListTile(
             leading: Icon(file.isDirectory ? Icons.folder : Icons.insert_drive_file),
             title: Text(file.name),
-            subtitle: Text(file.isDirectory ? 'Directory' : '${file.size} bytes'),
+            subtitle: Text(file.isDirectory ? 'Directory' : file.size == null ? '' : '${file.size} bytes'),
             onTap: () {
               if (file.isDirectory) {
                 _enterDirectory(file);

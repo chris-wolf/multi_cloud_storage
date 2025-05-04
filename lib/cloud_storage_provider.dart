@@ -33,8 +33,8 @@ abstract class CloudStorageProvider {
 class CloudFile {
   final String path;
   final String name;
-  final int size;
-  final DateTime modifiedTime;
+  final int? size;
+  final DateTime? modifiedTime;
   final bool isDirectory;
   final Map<String, dynamic>? metadata;
 

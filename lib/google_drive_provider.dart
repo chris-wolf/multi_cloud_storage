@@ -122,7 +122,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
       return CloudFile(
         path: join(path, file.name ?? ''),
         name: file.name ?? '',
-        size: int.tryParse(file.size ?? '0') ?? 0,
+        size: int.tryParse(file.size ?? '0'),
         modifiedTime: file.modifiedTime != null
             ? file.modifiedTime!
             : DateTime.now(),
@@ -181,7 +181,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
     return CloudFile(
       path: path,
       name: file.name ?? '',
-      size: int.tryParse(file.size ?? '0') ?? 0,
+      size: int.tryParse(file.size ?? '0'),
       modifiedTime: file.modifiedTime != null
           ? file.modifiedTime!
           : DateTime.now(),

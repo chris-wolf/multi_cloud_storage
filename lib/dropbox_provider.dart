@@ -1,6 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:dropbox_client/dropbox_client.dart';
 import 'cloud_storage_provider.dart';
+import 'package:http/http.dart' as http;
 
 class DropboxProvider extends CloudStorageProvider {
   bool _isAuthenticated = false;
@@ -27,7 +30,7 @@ class DropboxProvider extends CloudStorageProvider {
     } else {
       await Dropbox.authorizeWithAccessToken(accessToken);
     }
-    if (Dropbox.getAccessToken() == null) {
+    if ((await Dropbox.getAccessToken()) == null) {
       return null;
     }
     return DropboxProvider._instance(appKey: appKey, appSecret: appSecret, redirectUri: redirectUri).._isAuthenticated = true;
@@ -84,7 +87,7 @@ class DropboxProvider extends CloudStorageProvider {
       return CloudFile(
         path: entry['pathDisplay'] ?? '',
         name: entry['name'] ?? '',
-        size: entry['size'] ?? 0,
+        size: entry['size'],
         modifiedTime: DateTime.parse(
             entry['server_modified'] ?? DateTime.now().toIso8601String()),
         isDirectory: isFolder,
@@ -102,9 +105,22 @@ class DropboxProvider extends CloudStorageProvider {
       throw Exception('Not authenticated');
     }
 
-    // Note: The delete method is not directly exposed in the package
-    // We'll need to implement this using the API directly
-    throw UnimplementedError('Delete functionality not implemented');
+    final accessToken = await Dropbox.getAccessToken();
+
+    final response = await http.post(
+      Uri.parse('https://api.dropboxapi.com/2/files/delete_v2'),
+      headers: {
+        'Authorization': 'Bearer $accessToken',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'path': path.startsWith('/') ? path : '/$path',
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to delete file: ${response.body}');
+    }
   }
 
   @override
@@ -113,9 +129,21 @@ class DropboxProvider extends CloudStorageProvider {
       throw Exception('Not authenticated');
     }
 
-    // Note: The createFolder method is not directly exposed in the package
-    // We'll need to implement this using the API directly
-    throw UnimplementedError('Create directory functionality not implemented');
+    final response = await http.post(
+      Uri.parse('https://api.dropboxapi.com/2/files/create_folder_v2'),
+      headers: {
+        'Authorization': 'Bearer ${(await Dropbox.getAccessToken()) ?? ''}',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'path': path,
+        'autorename': false,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to create directory: ${response.body}');
+    }
   }
 
   @override
