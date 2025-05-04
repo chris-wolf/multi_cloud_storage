@@ -16,7 +16,7 @@ class DropboxProvider extends CloudStorageProvider {
         _appSecret = appSecret,
         _redirectUri = redirectUri;
 
-  static Future<DropboxProvider> connect(
+  static Future<DropboxProvider?> connect(
       {required String appKey,
       required String appSecret,
       required String redirectUri, String? accessToken}) async {
@@ -26,6 +26,9 @@ class DropboxProvider extends CloudStorageProvider {
       await Dropbox.authorizePKCE();
     } else {
       await Dropbox.authorizeWithAccessToken(accessToken);
+    }
+    if (Dropbox.getAccessToken() == null) {
+      return null;
     }
     return DropboxProvider._instance(appKey: appKey, appSecret: appSecret, redirectUri: redirectUri).._isAuthenticated = true;
   }

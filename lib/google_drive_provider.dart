@@ -5,16 +5,18 @@ import 'package:path/path.dart';
 import 'cloud_storage_provider.dart';
 import 'package:http/http.dart' as http;
 
+import 'multi_cloud_storage.dart';
+
 class GoogleDriveProvider extends CloudStorageProvider {
   late drive.DriveApi driveApi;
   bool _isAuthenticated = false;
 
   GoogleDriveProvider._create();
 
-  static Future<GoogleDriveProvider?> login() async {
+  static Future<GoogleDriveProvider?> connect() async {
     final googleSignIn = GoogleSignIn(
       scopes: [
-        CloudStorageProvider.cloudAccess == CloudAccessType.appStorage ?
+        MultiCloudStorage.cloudAccess == CloudAccessType.appStorage ?
         drive.DriveApi.driveFileScope :
         drive.DriveApi.driveScope,
       ],
@@ -47,11 +49,6 @@ class GoogleDriveProvider extends CloudStorageProvider {
     }
   }
 
-  static final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: [
-      'https://www.googleapis.com/auth/drive.file', // or 'drive' for full access
-    ],
-  );
 
   @override
   Future<String> uploadFile({

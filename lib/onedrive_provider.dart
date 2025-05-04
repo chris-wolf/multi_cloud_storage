@@ -2,32 +2,29 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_onedrive/flutter_onedrive.dart';
 import 'cloud_storage_provider.dart';
+import 'multi_cloud_storage.dart';
 
 class OneDriveProvider extends CloudStorageProvider {
   late OneDrive client;
   bool _isAuthenticated = false;
   final String clientId;
-  final String clientSecret;
   final String _redirectUri;
   final BuildContext _context;
 
   OneDriveProvider._create({
     required String clientId,
-    required String clientSecret,
     required String redirectUri,
     required BuildContext context,
   })  : clientId = clientId,
-        clientSecret = clientSecret,
         _redirectUri = redirectUri,
         _context = context;
 
    static Future<OneDriveProvider?> connect({
     required String clientId,
-    required String clientSecret,
     required String redirectUri,
     required BuildContext context,
   }) async {
-     final provider = OneDriveProvider._create(clientId: clientId, clientSecret: clientSecret, redirectUri: redirectUri, context: context);
+     final provider = OneDriveProvider._create(clientId: clientId, redirectUri: redirectUri, context: context);
      provider.client = OneDrive(
       clientID: clientId,
       redirectURL: redirectUri,
@@ -51,7 +48,7 @@ class OneDriveProvider extends CloudStorageProvider {
     }
     final file = File(localPath);
     final bytes = await file.readAsBytes();
-    await client.push(bytes, remotePath, isAppFolder: CloudStorageProvider.cloudAccess == CloudAccessType.appStorage);
+    await client.push(bytes, remotePath, isAppFolder: MultiCloudStorage.cloudAccess == CloudAccessType.appStorage);
     return remotePath;
   }
 
@@ -64,7 +61,7 @@ class OneDriveProvider extends CloudStorageProvider {
       throw Exception('Not authenticated');
     }
 
-    final response = await client.pull(remotePath,  isAppFolder: CloudStorageProvider.cloudAccess == CloudAccessType.appStorage);
+    final response = await client.pull(remotePath,  isAppFolder: MultiCloudStorage.cloudAccess == CloudAccessType.appStorage);
     final file = File(localPath);
     await file.writeAsBytes(response.bodyBytes!);
 
@@ -81,7 +78,7 @@ class OneDriveProvider extends CloudStorageProvider {
     }
     return (await client.listFiles(path,
       recursive: recursive,
-        isAppFolder: CloudStorageProvider.cloudAccess == CloudAccessType.appStorage
+        isAppFolder: MultiCloudStorage.cloudAccess == CloudAccessType.appStorage
     )).map((dropboxFile) => CloudFile(path: dropboxFile.path, name: dropboxFile.name, size: dropboxFile.size, modifiedTime: DateTime.fromMillisecondsSinceEpoch(0), isDirectory: dropboxFile.isFolder)).toList();
   }
 
@@ -89,7 +86,7 @@ class OneDriveProvider extends CloudStorageProvider {
   Future<void> deleteFile(String path) async {
     await client.deleteFile(
       path,
-        isAppFolder: CloudStorageProvider.cloudAccess == CloudAccessType.appStorage
+        isAppFolder: MultiCloudStorage.cloudAccess == CloudAccessType.appStorage
     );
   }
 
@@ -101,7 +98,7 @@ class OneDriveProvider extends CloudStorageProvider {
 
     await client.createDirectory(
       path,
-      isAppFolder: CloudStorageProvider.cloudAccess == CloudAccessType.appStorage
+      isAppFolder: MultiCloudStorage.cloudAccess == CloudAccessType.appStorage
     );
   }
 

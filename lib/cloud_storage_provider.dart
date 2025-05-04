@@ -1,6 +1,5 @@
 /// Abstract class defining the interface for cloud storage providers.
 abstract class CloudStorageProvider {
-  static CloudAccessType cloudAccess = CloudAccessType.appStorage;
   /// Uploads a file to the cloud storage.
   Future<String> uploadFile({
     required String localPath,
@@ -47,10 +46,4 @@ class CloudFile {
     required this.isDirectory,
     this.metadata,
   });
-}
-
-
-enum CloudAccessType {
-  appStorage,
-  fullAccess
 }

@@ -1,13 +1,14 @@
 # Multi Cloud Storage
 
-A Flutter plugin that provides a unified interface for working with multiple cloud storage providers.
+A Flutter plugin that provides a unified API for interacting with multiple cloud storage providers including Dropbox, Google Drive, and OneDrive.
 
 ## Supported Providers
 
+- Dropbox
 - Google Drive
-- Dropbox (coming soon)
-- OneDrive (coming soon)
-- iCloud (coming soon)
+- OneDrive
+
+---
 
 ## Installation
 
@@ -15,97 +16,113 @@ Add the following to your `pubspec.yaml` file:
 
 ```yaml
 dependencies:
-  multi_cloud_storage: ^0.0.1
+  multi_cloud_storage: ^your_version_here
 ```
 
-## Usage
+Run:
+
+```shell
+flutter pub get
+```
+
+---
+
+## Cloud Providers Setup
+
+### Dropbox
+
+1. **Register Your App**:
+    - Visit [Dropbox App Console](https://www.dropbox.com/developers/apps).
+    - Click "Create app".
+    - Select Scoped access and appropriate access type (`app folder` or `full Dropbox`).
+    - Generate access token for testing (user login doesn't work while app is Status: Development)
+    - Obtain your `App Key`, `App Secret` and `Access Token`.
+    - Set Redirect URI (OAuth), not required for mobile apps.
+
+
+#### Android
+Add this to /android/app/src/main/AndroidManifest.xml inside the application bloc and repolace YOUR_APP_KEY with the appKey:
+
+```dart
+        <!-- Add Dropbox Auth Activity -->
+        <activity
+            android:name="com.dropbox.core.android.AuthActivity"
+            android:exported="true"
+            android:launchMode="singleTask">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="db-YOUR_APP_KEY"  />
+            </intent-filter>
+        </activity>
+```  
 
 ### Google Drive
 
+1. **Setup Google Drive API**:
+
+    - Go to [Google Cloud Console Credentials](https://console.cloud.google.com/apis/credentials).
+    - Create Credentials -> OAuth client ID. ()
+    - Select "Android", "iOS", or "Web" based on your needs. (Make sure all data is correct for your app or else it won't work)
+
+### OneDrive
+
+1. **Register Your App**:
+
+    - Go to [Azure Portal App registration](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade).
+    - Click `New registration`.
+    - For native apps set Redirect URI to `https://login.microsoftonline.com/common/oauth2/nativeclient` .
+    - Obtain your `Client ID`.
+
+---
+
+## Usage
+
 ```dart
+import 'package:flutter/cupertino.dart';
 import 'package:multi_cloud_storage/multi_cloud_storage.dart';
-import 'package:multi_cloud_storage/providers/google_drive_storage.dart';
 
 void main() async {
-  // Initialize Google Drive storage
-  final googleDrive = GoogleDriveStorage();
-  
-  // Initialize the provider
-  await googleDrive.initialize();
-  
-  // Authenticate
-  final isAuthenticated = await googleDrive.authenticate();
-  if (!isAuthenticated) {
-    print('Failed to authenticate with Google Drive');
-    return;
-  }
-  
-  // Upload a file
-  final fileId = await googleDrive.uploadFile(
-    localPath: '/path/to/local/file.txt',
-    remotePath: '/remote/path/file.txt',
+  // Example: Connect to Dropbox
+  final dropbox = await MultiCloudStorage.connectToDropbox(
+    appKey: 'YOUR_APP_KEY',
+    appSecret: 'YOUR_APP_SECRET',
+    redirectUri: 'YOUR_REDIRECT_URI',
   );
-  
-  // Download a file
-  final localPath = await googleDrive.downloadFile(
-    remotePath: '/remote/path/file.txt',
-    localPath: '/path/to/save/file.txt',
+
+  // Example: Connect to Google Drive
+  final googleDrive = await MultiCloudStorage.connectToGoogleDrive();
+
+  // Example: Connect to OneDrive
+  final oneDrive = await MultiCloudStorage.connectToOneDrive(
+    clientId: 'YOUR_CLIENT_ID',
+    clientSecret: 'YOUR_CLIENT_SECRET',
+    redirectUri: 'YOUR_REDIRECT_URI',
+    context: context,
   );
-  
-  // List files in a directory
-  final files = await googleDrive.listFiles(
-    path: '/remote/path',
-    recursive: false,
-  );
-  
-  // Get file metadata
-  final metadata = await googleDrive.getFileMetadata('/remote/path/file.txt');
-  
-  // Create a directory
-  final created = await googleDrive.createDirectory('/remote/path/new_folder');
-  
-  // Move a file
-  final moved = await googleDrive.moveFile(
-    sourcePath: '/remote/path/file.txt',
-    destinationPath: '/remote/path/new_folder/file.txt',
-  );
-  
-  // Copy a file
-  final copied = await googleDrive.copyFile(
-    sourcePath: '/remote/path/file.txt',
-    destinationPath: '/remote/path/copy.txt',
-  );
-  
-  // Delete a file
-  final deleted = await googleDrive.deleteFile('/remote/path/file.txt');
-  
-  // Check if a file exists
-  final exists = await googleDrive.fileExists('/remote/path/file.txt');
-  
-  // Get storage space information
-  final space = await googleDrive.getStorageSpace();
-  print('Total space: ${space.totalSpace} bytes');
-  print('Used space: ${space.usedSpace} bytes');
-  print('Free space: ${space.freeSpace} bytes');
 }
 ```
 
+---
+
+
 ## Features
 
-- Unified interface for multiple cloud storage providers
-- File upload and download
-- Directory listing
-- File metadata retrieval
-- Directory creation
-- File moving and copying
-- File deletion
-- Storage space information
-- Authentication handling
+- Unified interface for multiple cloud storage providers.
+- Upload, download, delete, and manage files.
+- Create and list directories.
+- Retrieve file metadata.
 
-## Contributing
+---
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+## Contribution
+
+Feel free to submit pull requests and report issues.
+
+---
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+Distributed under the MIT License. See `LICENSE` for more information.
