@@ -17,6 +17,7 @@ dependencies:
   icloud_storage_sync: ^0.0.2
   path: ^1.9.1
   google_sign_in: ^6.3.0
+  http: ^1.4.0
 
 dev_dependencies:
   flutter_test:
