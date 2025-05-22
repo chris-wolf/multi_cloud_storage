@@ -24,6 +24,12 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^2.0.0
 
+platforms:
+  android:
+  ios:
+  macos:
+  windows:
+  
 screenshots:
   - description: 'Example cloud explorer'
     path: example/screenshots/Example_cloud_storage_explorer.jpg
