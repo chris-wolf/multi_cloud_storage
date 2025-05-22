@@ -13,7 +13,7 @@ dependencies:
   googleapis: ^14.0.0
   googleapis_auth: ^2.0.0
   dropbox_client: ^1.2.0
-  flutter_onedrive: 1.8.0
+  flutter_onedrive: ^1.8.0
   icloud_storage_sync: ^0.0.2
   path: ^1.9.1
   google_sign_in: ^6.3.0
