@@ -42,7 +42,7 @@ flutter pub get
 
 
 #### Android
-Add this to /android/app/src/main/AndroidManifest.xml inside the application bloc and repolace YOUR_APP_KEY with the appKey:
+Add this to /android/app/src/main/AndroidManifest.xml inside the application bloc and replace YOUR_APP_KEY with the appKey:
 
 ```dart
         <!-- Add Dropbox Auth Activity -->
