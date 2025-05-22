@@ -61,7 +61,7 @@ class _CloudStorageExampleState extends State<CloudStorageExample> {
                   ),
                   ElevatedButton(
                     onPressed: () async {
-                      final provider = await MultiCloudStorage.connectToGoogleDrive(); // App registration required: https://console.cloud.google.com/auth/overview?inv=1&invt=AbwVjA&project=serious-mariner-457313-i7
+                      final provider = await MultiCloudStorage.connectToGoogleDrive(); // App registration required: https://console.cloud.google.com/apis/credentials
                       if (provider != null && context.mounted) {
                         openExplorer(context, provider);
                       }

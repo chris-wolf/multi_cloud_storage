@@ -86,7 +86,7 @@ import 'package:multi_cloud_storage/multi_cloud_storage.dart';
 
 void main() async {
    // Connect to GoogleDrive
-   final googleDrive = await MultiCloudStorage.connectToGoogleDrive(); // App registration required: https://console.cloud.google.com/auth/overview?inv=1&invt=AbwVjA&project=serious-mariner-457313-i7
+   final googleDrive = await MultiCloudStorage.connectToGoogleDrive(); // App registration required: https://console.cloud.google.com/apis/credentials
 
    // Upload a file
    final uploadedPath = await googleDrive.uploadFile(
