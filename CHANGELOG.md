@@ -1,3 +1,7 @@
+## 0.3.0
+
+* Small adjustmetns
+
 ## 0.2.0
 
 * Fixed README

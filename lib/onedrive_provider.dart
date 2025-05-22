@@ -17,16 +17,18 @@ class OneDriveProvider extends CloudStorageProvider {
     required this.context,
   });
 
-   static Future<OneDriveProvider?> connect({
+  static Future<OneDriveProvider?> connect({
     required String clientId,
     required String redirectUri,
     required BuildContext context,
   }) async {
-     if (clientId.trim().isEmpty && redirectUri.trim().isEmpty) {
-       throw ArgumentError('App registration required: https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade');
-     }
-     final provider = OneDriveProvider._create(clientId: clientId, redirectUri: redirectUri, context: context);
-     provider.client = OneDrive(
+    if (clientId.trim().isEmpty && redirectUri.trim().isEmpty) {
+      throw ArgumentError(
+          'App registration required: https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade');
+    }
+    final provider = OneDriveProvider._create(
+        clientId: clientId, redirectUri: redirectUri, context: context);
+    provider.client = OneDrive(
       clientID: clientId,
       redirectURL: redirectUri,
     );
@@ -49,7 +51,9 @@ class OneDriveProvider extends CloudStorageProvider {
     }
     final file = File(localPath);
     final bytes = await file.readAsBytes();
-    await client.push(bytes, remotePath, isAppFolder: MultiCloudStorage.cloudAccess == CloudAccessType.appStorage);
+    await client.push(bytes, remotePath,
+        isAppFolder:
+            MultiCloudStorage.cloudAccess == CloudAccessType.appStorage);
     return remotePath;
   }
 
@@ -62,7 +66,9 @@ class OneDriveProvider extends CloudStorageProvider {
       throw Exception('Not authenticated');
     }
 
-    final response = await client.pull(remotePath,  isAppFolder: MultiCloudStorage.cloudAccess == CloudAccessType.appStorage);
+    final response = await client.pull(remotePath,
+        isAppFolder:
+            MultiCloudStorage.cloudAccess == CloudAccessType.appStorage);
     final file = File(localPath);
     await file.writeAsBytes(response.bodyBytes!);
 
@@ -78,17 +84,23 @@ class OneDriveProvider extends CloudStorageProvider {
       throw Exception('Not authenticated');
     }
     return (await client.listFiles(path,
-      recursive: recursive,
-        isAppFolder: MultiCloudStorage.cloudAccess == CloudAccessType.appStorage
-    )).map((dropboxFile) => CloudFile(path: dropboxFile.path, name: dropboxFile.name, size: dropboxFile.size, modifiedTime: DateTime.fromMillisecondsSinceEpoch(0), isDirectory: dropboxFile.isFolder)).toList();
+            recursive: recursive,
+            isAppFolder:
+                MultiCloudStorage.cloudAccess == CloudAccessType.appStorage))
+        .map((dropboxFile) => CloudFile(
+            path: dropboxFile.path,
+            name: dropboxFile.name,
+            size: dropboxFile.size,
+            modifiedTime: DateTime.fromMillisecondsSinceEpoch(0),
+            isDirectory: dropboxFile.isFolder))
+        .toList();
   }
 
   @override
   Future<void> deleteFile(String path) async {
-    await client.deleteFile(
-      path,
-        isAppFolder: MultiCloudStorage.cloudAccess == CloudAccessType.appStorage
-    );
+    await client.deleteFile(path,
+        isAppFolder:
+            MultiCloudStorage.cloudAccess == CloudAccessType.appStorage);
   }
 
   @override
@@ -97,10 +109,9 @@ class OneDriveProvider extends CloudStorageProvider {
       throw Exception('Not authenticated');
     }
 
-    await client.createDirectory(
-      path,
-      isAppFolder: MultiCloudStorage.cloudAccess == CloudAccessType.appStorage
-    );
+    await client.createDirectory(path,
+        isAppFolder:
+            MultiCloudStorage.cloudAccess == CloudAccessType.appStorage);
   }
 
   @override

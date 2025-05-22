@@ -16,9 +16,9 @@ class GoogleDriveProvider extends CloudStorageProvider {
   static Future<GoogleDriveProvider?> connect() async {
     final googleSignIn = GoogleSignIn(
       scopes: [
-        MultiCloudStorage.cloudAccess == CloudAccessType.appStorage ?
-        drive.DriveApi.driveFileScope :
-        drive.DriveApi.driveScope,
+        MultiCloudStorage.cloudAccess == CloudAccessType.appStorage
+            ? drive.DriveApi.driveFileScope
+            : drive.DriveApi.driveScope,
       ],
     );
 
@@ -32,7 +32,8 @@ class GoogleDriveProvider extends CloudStorageProvider {
 
     final authHeaders = {
       'Authorization': 'Bearer ${authentication.accessToken}',
-      'X-Goog-AuthUser': '0', // optional but sometimes needed for Drive multi-accounts
+      'X-Goog-AuthUser':
+          '0', // optional but sometimes needed for Drive multi-accounts
     };
 
     final authenticateClient = GoogleAuthClient(authHeaders);
@@ -48,7 +49,6 @@ class GoogleDriveProvider extends CloudStorageProvider {
       throw Exception('Not authenticated');
     }
   }
-
 
   @override
   Future<String> uploadFile({
@@ -67,7 +67,8 @@ class GoogleDriveProvider extends CloudStorageProvider {
       ..parents = [folder.id!];
 
     final media = drive.Media(file.openRead(), await file.length());
-    final uploadedFile = await driveApi.files.create(driveFile, uploadMedia: media);
+    final uploadedFile =
+        await driveApi.files.create(driveFile, uploadMedia: media);
 
     return uploadedFile.id!;
   }
@@ -119,20 +120,19 @@ class GoogleDriveProvider extends CloudStorageProvider {
     );
 
     return files.files?.map((file) {
-      return CloudFile(
-        path: join(path, file.name ?? ''),
-        name: file.name ?? '',
-        size: int.tryParse(file.size ?? '0'),
-        modifiedTime: file.modifiedTime != null
-            ? file.modifiedTime!
-            : DateTime.now(),
-        isDirectory: file.mimeType == 'application/vnd.google-apps.folder',
-        metadata: {
-          'id': file.id,
-          'mimeType': file.mimeType,
-        },
-      );
-    }).toList() ??
+          return CloudFile(
+            path: join(path, file.name ?? ''),
+            name: file.name ?? '',
+            size: int.tryParse(file.size ?? '0'),
+            modifiedTime:
+                file.modifiedTime != null ? file.modifiedTime! : DateTime.now(),
+            isDirectory: file.mimeType == 'application/vnd.google-apps.folder',
+            metadata: {
+              'id': file.id,
+              'mimeType': file.mimeType,
+            },
+          );
+        }).toList() ??
         [];
   }
 
@@ -182,9 +182,8 @@ class GoogleDriveProvider extends CloudStorageProvider {
       path: path,
       name: file.name ?? '',
       size: int.tryParse(file.size ?? '0'),
-      modifiedTime: file.modifiedTime != null
-          ? file.modifiedTime!
-          : DateTime.now(),
+      modifiedTime:
+          file.modifiedTime != null ? file.modifiedTime! : DateTime.now(),
       isDirectory: file.mimeType == 'application/vnd.google-apps.folder',
       metadata: {
         'id': file.id,
@@ -251,7 +250,6 @@ class GoogleDriveProvider extends CloudStorageProvider {
     return await driveApi.files.create(folder);
   }
 }
-
 
 class GoogleAuthClient extends http.BaseClient {
   final Map<String, String> _headers;

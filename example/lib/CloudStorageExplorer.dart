@@ -7,14 +7,15 @@ import 'dart:io';
 
 import 'package:permission_handler/permission_handler.dart';
 
-
 class CloudStorageExplorerPage extends StatefulWidget {
   final CloudStorageProvider cloudStorageProvider;
 
-  const CloudStorageExplorerPage({Key? key, required this.cloudStorageProvider}) : super(key: key);
+  const CloudStorageExplorerPage({Key? key, required this.cloudStorageProvider})
+      : super(key: key);
 
   @override
-  _CloudStorageExplorerPageState createState() => _CloudStorageExplorerPageState();
+  _CloudStorageExplorerPageState createState() =>
+      _CloudStorageExplorerPageState();
 }
 
 class _CloudStorageExplorerPageState extends State<CloudStorageExplorerPage> {
@@ -32,10 +33,11 @@ class _CloudStorageExplorerPageState extends State<CloudStorageExplorerPage> {
     setState(() {
       isLoading = true;
     });
-      final listedFiles = await widget.cloudStorageProvider.listFiles(path: currentPath);
-      setState(() {
-        files = listedFiles;
-      });
+    final listedFiles =
+        await widget.cloudStorageProvider.listFiles(path: currentPath);
+    setState(() {
+      files = listedFiles;
+    });
     setState(() {
       isLoading = false;
     });
@@ -48,7 +50,8 @@ class _CloudStorageExplorerPageState extends State<CloudStorageExplorerPage> {
       final fileName = result.files.single.name;
       final remotePath = path.join(currentPath, fileName);
       try {
-        await widget.cloudStorageProvider.uploadFile(localPath: localPath, remotePath: remotePath);
+        await widget.cloudStorageProvider
+            .uploadFile(localPath: localPath, remotePath: remotePath);
         _loadFiles();
       } catch (e) {
         _showError('Upload failed: $e');
@@ -108,7 +111,7 @@ class _CloudStorageExplorerPageState extends State<CloudStorageExplorerPage> {
             onPressed: () async {
               final dirName = controller.text.trim();
               if (dirName.isNotEmpty) {
-                final dirPath =  path.join(currentPath, dirName);
+                final dirPath = path.join(currentPath, dirName);
                 try {
                   await widget.cloudStorageProvider.createDirectory(dirPath);
                   _loadFiles();
@@ -130,19 +133,22 @@ class _CloudStorageExplorerPageState extends State<CloudStorageExplorerPage> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: Colors.red));
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.red));
   }
 
   void _showMessage(String message, String? filePath) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        action: filePath == null ? null : SnackBarAction(
-          label: 'Open',
-          onPressed: () {
-            OpenFile.open(filePath);
-          },
-        ),
+        action: filePath == null
+            ? null
+            : SnackBarAction(
+                label: 'Open',
+                onPressed: () {
+                  OpenFile.open(filePath);
+                },
+              ),
       ),
     );
   }
@@ -160,56 +166,62 @@ class _CloudStorageExplorerPageState extends State<CloudStorageExplorerPage> {
 
   @override
   Widget build(BuildContext context) {
-    return  WillPopScope(
+    return WillPopScope(
         onWillPop: _onWillPop,
         child: Scaffold(
-      appBar: AppBar(
-        title: Text('Cloud Explorer: $currentPath'),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.create_new_folder),
-            onPressed: _createDirectory,
-            tooltip: 'New Directory',
+          appBar: AppBar(
+            title: Text('Cloud Explorer: $currentPath'),
+            actions: [
+              IconButton(
+                icon: Icon(Icons.create_new_folder),
+                onPressed: _createDirectory,
+                tooltip: 'New Directory',
+              ),
+              IconButton(
+                icon: Icon(Icons.upload_file),
+                onPressed: _uploadFile,
+                tooltip: 'Upload File',
+              ),
+              IconButton(
+                icon: Icon(Icons.refresh),
+                onPressed: _refresh,
+                tooltip: 'Refresh',
+              ),
+            ],
           ),
-          IconButton(
-            icon: Icon(Icons.upload_file),
-            onPressed: _uploadFile,
-            tooltip: 'Upload File',
-          ),
-          IconButton(
-            icon: Icon(Icons.refresh),
-            onPressed: _refresh,
-            tooltip: 'Refresh',
-          ),
-        ],
-      ),
-      body: isLoading
-          ? Center(child: CircularProgressIndicator())
-          : files.isEmpty
-          ? Center(child: Text('No files here'))
-          : ListView.builder(
-        itemCount: files.length,
-        itemBuilder: (context, index) {
-          final file = files[index];
-          return ListTile(
-            leading: Icon(file.isDirectory ? Icons.folder : Icons.insert_drive_file),
-            title: Text(file.name),
-            subtitle: Text(file.isDirectory ? 'Directory' : file.size == null ? '' : '${file.size} bytes'),
-            onTap: () {
-              if (file.isDirectory) {
-                _enterDirectory(file);
-              } else {
-                _downloadFile(file);
-              }
-            },
-            trailing: IconButton(
-              icon: Icon(Icons.delete, color: Colors.red),
-              onPressed: () => _deleteFile(file),
-            ),
-          );
-        },
-      ),
-    ));
+          body: isLoading
+              ? Center(child: CircularProgressIndicator())
+              : files.isEmpty
+                  ? Center(child: Text('No files here'))
+                  : ListView.builder(
+                      itemCount: files.length,
+                      itemBuilder: (context, index) {
+                        final file = files[index];
+                        return ListTile(
+                          leading: Icon(file.isDirectory
+                              ? Icons.folder
+                              : Icons.insert_drive_file),
+                          title: Text(file.name),
+                          subtitle: Text(file.isDirectory
+                              ? 'Directory'
+                              : file.size == null
+                                  ? ''
+                                  : '${file.size} bytes'),
+                          onTap: () {
+                            if (file.isDirectory) {
+                              _enterDirectory(file);
+                            } else {
+                              _downloadFile(file);
+                            }
+                          },
+                          trailing: IconButton(
+                            icon: Icon(Icons.delete, color: Colors.red),
+                            onPressed: () => _deleteFile(file),
+                          ),
+                        );
+                      },
+                    ),
+        ));
   }
 
   Future<bool> _requestStoragePermission() async {
@@ -246,5 +258,4 @@ class _CloudStorageExplorerPageState extends State<CloudStorageExplorerPage> {
     });
     _loadFiles();
   }
-
 }

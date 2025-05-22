@@ -20,11 +20,13 @@ class DropboxProvider extends CloudStorageProvider {
   static Future<DropboxProvider?> connect(
       {required String appKey,
       required String appSecret,
-      required String redirectUri, String? accessToken}) async {
-
-
-    if (appKey.trim().isEmpty && redirectUri.trim().isEmpty && (accessToken?.isEmpty ?? true)) {
-      throw ArgumentError('App registration required required https://www.dropbox.com/developers/apps');
+      required String redirectUri,
+      String? accessToken}) async {
+    if (appKey.trim().isEmpty &&
+        redirectUri.trim().isEmpty &&
+        (accessToken?.isEmpty ?? true)) {
+      throw ArgumentError(
+          'App registration required required https://www.dropbox.com/developers/apps');
     }
 
     await Dropbox.init(appKey, appKey, appSecret);
@@ -36,7 +38,9 @@ class DropboxProvider extends CloudStorageProvider {
     if ((await Dropbox.getAccessToken()) == null) {
       return null;
     }
-    return DropboxProvider._instance(appKey: appKey, appSecret: appSecret, redirectUri: redirectUri).._isAuthenticated = true;
+    return DropboxProvider._instance(
+        appKey: appKey, appSecret: appSecret, redirectUri: redirectUri)
+      .._isAuthenticated = true;
   }
 
   @override

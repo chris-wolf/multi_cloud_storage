@@ -16,9 +16,7 @@ class CloudStorageExample extends StatefulWidget {
 }
 
 class _CloudStorageExampleState extends State<CloudStorageExample> {
-
   CloudStorageProvider? cloudStorageProvider;
-
 
   @override
   void initState() {
@@ -29,57 +27,60 @@ class _CloudStorageExampleState extends State<CloudStorageExample> {
   Widget build(BuildContext context) {
     return MaterialApp(
       home: Scaffold(
-        body: Builder(
-          builder: (context) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ElevatedButton(
-                    child: Text('Dropbox'),
-                    onPressed: () async {
-                      final provider = await MultiCloudStorage.connectToDropbox(
-                          appKey: '',
-                          appSecret: '',
-                          redirectUri: '', accessToken: ''); // App registration required: https://www.dropbox.com/developers/apps
-                      if (provider != null && context.mounted) {
-                        openExplorer(context, provider);
-                      }
-                    },
-                  ),
-                  ElevatedButton(
-                    child: Text('Onedrive'),
-                    onPressed: () async  {
-                      final provider = await MultiCloudStorage.connectToOneDrive(
-                          clientId: '',
-                          redirectUri: '',
-                          context: context); // App registration required: https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade
-                      if (provider != null && context.mounted) {
-                        openExplorer(context, provider);
-                      }
-                    },
-                  ),
-                  ElevatedButton(
-                    onPressed: () async {
-                      final provider = await MultiCloudStorage.connectToGoogleDrive(); // App registration required: https://console.cloud.google.com/apis/credentials
-                      if (provider != null && context.mounted) {
-                        openExplorer(context, provider);
-                      }
-                    },
-                    child: Text('Google Drive'),
-                  ),
-                ],
-              ),
-            );
-          }
-        ),
+        body: Builder(builder: (context) {
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ElevatedButton(
+                  child: Text('Dropbox'),
+                  onPressed: () async {
+                    final provider = await MultiCloudStorage.connectToDropbox(
+                        appKey: '',
+                        appSecret: '',
+                        redirectUri: '',
+                        accessToken:
+                            ''); // App registration required: https://www.dropbox.com/developers/apps
+                    if (provider != null && context.mounted) {
+                      openExplorer(context, provider);
+                    }
+                  },
+                ),
+                ElevatedButton(
+                  child: Text('Onedrive'),
+                  onPressed: () async {
+                    final provider = await MultiCloudStorage.connectToOneDrive(
+                        clientId: '',
+                        redirectUri: '',
+                        context:
+                            context); // App registration required: https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade
+                    if (provider != null && context.mounted) {
+                      openExplorer(context, provider);
+                    }
+                  },
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final provider = await MultiCloudStorage
+                        .connectToGoogleDrive(); // App registration required: https://console.cloud.google.com/apis/credentials
+                    if (provider != null && context.mounted) {
+                      openExplorer(context, provider);
+                    }
+                  },
+                  child: Text('Google Drive'),
+                ),
+              ],
+            ),
+          );
+        }),
       ),
     );
   }
 
   void openExplorer(BuildContext context, CloudStorageProvider provider) {
     Navigator.of(context).push(MaterialPageRoute(
-      builder: (context) => CloudStorageExplorerPage(cloudStorageProvider: provider),
+      builder: (context) =>
+          CloudStorageExplorerPage(cloudStorageProvider: provider),
     ));
   }
 }
