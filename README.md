@@ -82,28 +82,37 @@ Add this to /android/app/src/main/AndroidManifest.xml inside the application blo
 ## Usage
 
 ```dart
-import 'package:flutter/cupertino.dart';
 import 'package:multi_cloud_storage/multi_cloud_storage.dart';
 
 void main() async {
-  // Example: Connect to Dropbox
-  final dropbox = await MultiCloudStorage.connectToDropbox(
-    appKey: 'YOUR_APP_KEY',
-    appSecret: 'YOUR_APP_SECRET',
-    redirectUri: 'YOUR_REDIRECT_URI',
-  );
+   // Connect to GoogleDrive
+   final googleDrive = await MultiCloudStorage.connectToGoogleDrive(); // App registration required: https://console.cloud.google.com/auth/overview?inv=1&invt=AbwVjA&project=serious-mariner-457313-i7
 
-  // Example: Connect to Google Drive
-  final googleDrive = await MultiCloudStorage.connectToGoogleDrive();
+   // Upload a file
+   final uploadedPath = await googleDrive.uploadFile(
+      localPath: '/local/path/to/file.txt',
+      remotePath: '/remote/path/file.txt',
+   );
+   print('Uploaded to: $uploadedPath');
 
-  // Example: Connect to OneDrive
-  final oneDrive = await MultiCloudStorage.connectToOneDrive(
-    clientId: 'YOUR_CLIENT_ID',
-    clientSecret: 'YOUR_CLIENT_SECRET',
-    redirectUri: 'YOUR_REDIRECT_URI',
-    context: context,
-  );
+   // List files in a folder
+   final files = await googleDrive.listFiles(path: '/remote/path');
+   for (final file in files) {
+      print('Found file: ${file.name} (${file.path})');
+   }
+
+   // Download a file
+   final localFile = await googleDrive.downloadFile(
+      remotePath: '/remote/path/file.txt',
+      localPath: '/local/path/downloaded.txt',
+   );
+   print('Downloaded to: $localFile');
+
+   // Delete a file
+   await googleDrive.deleteFile('/remote/path/file.txt');
+   print('File deleted');
 }
+
 ```
 
 ---
