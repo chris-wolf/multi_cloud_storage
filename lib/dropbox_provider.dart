@@ -7,22 +7,25 @@ import 'package:http/http.dart' as http;
 
 class DropboxProvider extends CloudStorageProvider {
   bool _isAuthenticated = false;
-  late String _appKey;
-  late String _appSecret;
-  late String _redirectUri;
+  late String appKey;
+  late String appSecret;
+  late String redirectUri;
 
   DropboxProvider._instance({
-    required String appKey,
-    required String appSecret,
-    required String redirectUri,
-  })  : _appKey = appKey,
-        _appSecret = appSecret,
-        _redirectUri = redirectUri;
+    required this.appKey,
+    required this.appSecret,
+    required this.redirectUri,
+  });
 
   static Future<DropboxProvider?> connect(
       {required String appKey,
       required String appSecret,
       required String redirectUri, String? accessToken}) async {
+
+
+    if (appKey.trim().isEmpty && redirectUri.trim().isEmpty && (accessToken?.isEmpty ?? true)) {
+      throw ArgumentError('App registration required required https://www.dropbox.com/developers/apps');
+    }
 
     await Dropbox.init(appKey, appKey, appSecret);
     if (accessToken == null) {

@@ -1,3 +1,5 @@
-## 0.0.1
+## 0.1.0
 
-* TODO: Describe initial release.
+* Support for Google Drive
+* Support for OneDrive
+* Support for Dropbox

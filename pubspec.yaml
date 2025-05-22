@@ -1,6 +1,6 @@
 name: multi_cloud_storage
 description: A Flutter plugin for multi-cloud storage that supports Google Drive, iCloud, Dropbox, and OneDrive.
-version: 0.0.1
+version: 0.1.0
 homepage: https://github.com/yourusername/multi_cloud_storage
 
 environment:
@@ -12,11 +12,10 @@ dependencies:
     sdk: flutter
   googleapis: ^14.0.0
   googleapis_auth: ^2.0.0
-  dropbox_client: ^1.1.2
-  flutter_onedrive:
-    path: ../flutter_onedrive
+  dropbox_client: ^1.2.0
+  flutter_onedrive: 1.8.0
   icloud_storage_sync: ^0.0.2
-  path: ^1.8.3
+  path: ^1.9.1
   google_sign_in: ^6.3.0
 
 dev_dependencies:

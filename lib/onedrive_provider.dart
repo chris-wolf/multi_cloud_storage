@@ -8,22 +8,23 @@ class OneDriveProvider extends CloudStorageProvider {
   late OneDrive client;
   bool _isAuthenticated = false;
   final String clientId;
-  final String _redirectUri;
-  final BuildContext _context;
+  final String redirectUri;
+  final BuildContext context;
 
   OneDriveProvider._create({
-    required String clientId,
-    required String redirectUri,
-    required BuildContext context,
-  })  : clientId = clientId,
-        _redirectUri = redirectUri,
-        _context = context;
+    required this.clientId,
+    required this.redirectUri,
+    required this.context,
+  });
 
    static Future<OneDriveProvider?> connect({
     required String clientId,
     required String redirectUri,
     required BuildContext context,
   }) async {
+     if (clientId.trim().isEmpty && redirectUri.trim().isEmpty) {
+       throw ArgumentError('App registration required: https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade');
+     }
      final provider = OneDriveProvider._create(clientId: clientId, redirectUri: redirectUri, context: context);
      provider.client = OneDrive(
       clientID: clientId,
