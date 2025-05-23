@@ -163,4 +163,14 @@ class DropboxProvider extends CloudStorageProvider {
     // We'll need to implement this using the API directly
     throw UnimplementedError('Get metadata functionality not implemented');
   }
+
+  @override
+  Future<bool> logout() async {
+    if (_isAuthenticated) {
+      await Dropbox.authorizeWithAccessToken('');
+      _isAuthenticated = false;
+      return true;
+    }
+    return false;
+  }
 }

@@ -27,6 +27,9 @@ abstract class CloudStorageProvider {
 
   /// Gets the metadata of a file.
   Future<CloudFile> getFileMetadata(String path);
+
+  /// Logout user.
+    Future<bool> logout();
 }
 
 /// Represents a file in cloud storage.

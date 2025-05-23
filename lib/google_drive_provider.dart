@@ -484,4 +484,13 @@ class GoogleDriveProvider extends CloudStorageProvider {
   String _sanitizeQueryString(String value) {
     return value.replaceAll("'", "\\'");
   }
+
+  @override
+  Future<bool> logout() async {
+    if (_isAuthenticated) {
+      await signOut();
+      return true;
+    }
+    return false;
+  }
 }
