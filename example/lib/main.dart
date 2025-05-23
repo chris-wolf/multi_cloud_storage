@@ -20,6 +20,7 @@ class _CloudStorageExampleState extends State<CloudStorageExample> {
 
   @override
   void initState() {
+    super.initState();
     MultiCloudStorage.cloudAccess = CloudAccessType.appStorage;
   }
 

@@ -2,6 +2,17 @@
 
 A Flutter plugin that provides a unified API for interacting with multiple cloud storage providers including Dropbox, Google Drive, and OneDrive.
 
+
+
+## Features
+
+- Unified interface for multiple cloud storage providers.
+- Upload, download, delete, and manage files.
+- Create and list directories.
+- Retrieve file metadata.
+
+---
+
 ## Supported Platforms
 
 | Service       | Android | iOS | Mac  | Windows |
@@ -117,15 +128,6 @@ void main() async {
 
 ---
 
-
-## Features
-
-- Unified interface for multiple cloud storage providers.
-- Upload, download, delete, and manage files.
-- Create and list directories.
-- Retrieve file metadata.
-
----
 
 ## Contribution
 
