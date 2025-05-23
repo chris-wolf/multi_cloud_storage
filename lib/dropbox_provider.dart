@@ -173,4 +173,11 @@ class DropboxProvider extends CloudStorageProvider {
     }
     return false;
   }
+
+  @override
+  Future<bool> tokenExpired() async {
+    if (!_isAuthenticated) return true;
+    final token = await Dropbox.getAccessToken();
+    return token == null || token.isEmpty;
+  }
 }

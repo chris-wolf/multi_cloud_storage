@@ -493,4 +493,33 @@ class GoogleDriveProvider extends CloudStorageProvider {
     }
     return false;
   }
+
+  @override
+  Future<bool> tokenExpired() async {
+    if (!_isAuthenticated || _instance == null) return true;
+
+    try {
+      // Try a simple API call to check if token is valid
+      await driveApi.files.list(
+        spaces: MultiCloudStorage.cloudAccess == CloudAccessType.appStorage
+            ? 'appDataFolder'
+            : 'drive',
+        pageSize: 1,
+      );
+      return false;
+    } on drive.DetailedApiRequestError catch (e) {
+      if (e.status == 401 || e.status == 403) {
+        // Token is invalid or expired
+        return true;
+      }
+      return false; // Some other API error
+    } on http.ClientException catch (_) {
+      // Likely a network issue, not an auth issue
+      return false;
+    } catch (_) {
+      // Unknown error, assume token is still valid to be safe
+      return false;
+    }
+  }
+
 }

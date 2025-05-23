@@ -29,7 +29,10 @@ abstract class CloudStorageProvider {
   Future<CloudFile> getFileMetadata(String path);
 
   /// Logout user.
-    Future<bool> logout();
+  Future<bool> logout();
+
+  /// Checks if the suer token is still expired.
+  Future<bool> tokenExpired();
 }
 
 /// Represents a file in cloud storage.

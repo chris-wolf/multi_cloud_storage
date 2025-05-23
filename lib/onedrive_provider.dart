@@ -134,4 +134,16 @@ class OneDriveProvider extends CloudStorageProvider {
     }
     return false;
   }
+
+  @override
+  Future<bool> tokenExpired() async {
+    if (!_isAuthenticated) return true;
+    try {
+      // Try a simple API call to check if token is valid
+      await client.listFiles('/');
+      return false;
+    } catch (e) {
+      return e.toString().contains('401') ||  e.toString().contains('403');
+    }
+  }
 }
