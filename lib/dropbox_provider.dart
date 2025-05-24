@@ -165,6 +165,59 @@ class DropboxProvider extends CloudStorageProvider {
   }
 
   @override
+  Future<Uri?> generateSharableLinkWithMetadata(String path) async {
+    if (!_isAuthenticated) {
+      throw Exception('Not authenticated');
+    }
+
+    final accessToken = await Dropbox.getAccessToken();
+    final fixedPath = path.startsWith('/') ? path : '/$path';
+
+    try {
+      // Create a shared link with default visibility
+      final response = await http.post(
+        Uri.parse('https://api.dropboxapi.com/2/sharing/create_shared_link_with_settings'),
+        headers: {
+          'Authorization': 'Bearer $accessToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'path': fixedPath,
+          'settings': {
+            'requested_visibility': 'public',
+          },
+        }),
+      );
+
+      if (response.statusCode != 200) {
+        print("DropboxProvider: Failed to create shared link: ${response.body}");
+        return null;
+      }
+
+      final json = jsonDecode(response.body);
+      final url = json['url'];
+      if (url == null) {
+        print("DropboxProvider: No URL returned.");
+        return null;
+      }
+
+      // Optionally encode original path info as query parameters
+      final shareableUri = Uri.parse(url).replace(
+        queryParameters: {
+          ...Uri.parse(url).queryParameters,
+          'originalPath': path,
+        },
+      );
+
+      return shareableUri;
+    } catch (e) {
+      print("DropboxProvider: Error generating shareable link: $e");
+      return null;
+    }
+  }
+
+
+  @override
   Future<bool> logout() async {
     if (_isAuthenticated) {
       await Dropbox.authorizeWithAccessToken('');

@@ -1,8 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_onedrive/flutter_onedrive.dart';
+import 'package:flutter_onedrive/token.dart';
 import 'cloud_storage_provider.dart';
 import 'multi_cloud_storage.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class OneDriveProvider extends CloudStorageProvider {
   late OneDrive client;
@@ -123,6 +126,66 @@ class OneDriveProvider extends CloudStorageProvider {
     // Note: The package doesn't provide a direct get metadata method
     // We'll need to implement this using the API directly
     throw UnimplementedError('Get metadata functionality not implemented');
+  }
+
+  @override
+  Future<Uri?> generateSharableLinkWithMetadata(String path) async {
+    if (!_isAuthenticated) {
+      throw Exception('Not authenticated');
+    }
+
+    final accessToken = await DefaultTokenManager(
+      tokenEndpoint: OneDrive.tokenEndpoint,
+      clientID: client.clientID,
+      redirectURL: client.redirectURL,
+      scope: client.scopes,
+    ).getAccessToken(); //accesToken is private so need to access it like this
+    if (accessToken == null || accessToken.isEmpty) {
+      print("OneDriveProvider: No access token available.");
+      return null;
+    }
+
+    final encodedPath = Uri.encodeComponent(path.startsWith('/') ? path.substring(1) : path);
+    final driveItemPath = "/me/drive/root:/$encodedPath:/createLink";
+
+    try {
+      final response = await http.post(
+        Uri.parse("https://graph.microsoft.com/v1.0$driveItemPath"),
+        headers: {
+          'Authorization': 'Bearer $accessToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          "type": "view", // or "edit" if you want an editable link
+          "scope": "anonymous"
+        }),
+      );
+
+      if (response.statusCode != 200) {
+        print("OneDriveProvider: Failed to create shareable link: ${response.body}");
+        return null;
+      }
+
+      final json = jsonDecode(response.body);
+      final link = json['link']?['webUrl'];
+      if (link == null) {
+        print("OneDriveProvider: No shareable link returned.");
+        return null;
+      }
+
+      // Append original path metadata as a query parameter
+      final shareableUri = Uri.parse(link).replace(
+        queryParameters: {
+          ...Uri.parse(link).queryParameters,
+          'originalPath': path,
+        },
+      );
+
+      return shareableUri;
+    } catch (e) {
+      print("OneDriveProvider: Error creating shareable link: $e");
+      return null;
+    }
   }
 
   @override

@@ -33,6 +33,8 @@ abstract class CloudStorageProvider {
 
   /// Checks if the suer token is still expired.
   Future<bool> tokenExpired();
+
+  Future<Uri?> generateSharableLinkWithMetadata(String path);
 }
 
 /// Represents a file in cloud storage.

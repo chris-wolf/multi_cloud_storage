@@ -485,6 +485,63 @@ class GoogleDriveProvider extends CloudStorageProvider {
     return value.replaceAll("'", "\\'");
   }
 
+  /// Add this function to the GoogleDriveProvider class
+  /// It creates a shareable link for a given file or folder path,
+  /// and optionally returns metadata so the recipient can recreate the original folder structure.
+  @override
+  Future<Uri?> generateSharableLinkWithMetadata(String path) async {
+    _checkAuth();
+
+    final drive.File? file = await _getFileByPath(path);
+    if (file == null || file.id == null) {
+      print("GoogleDriveProvider: File not found at $path");
+      return null;
+    }
+
+    // Set permission to anyone with the link can edit
+    final permission = drive.Permission()
+      ..type = 'anyone'
+      ..role = 'writer';
+
+    try {
+      await driveApi.permissions.create(
+        permission,
+        file.id!,
+        $fields: 'id',
+      );
+    } catch (e) {
+      print("Error setting permission for sharing: $e");
+      return null;
+    }
+
+    // Generate shareable link
+    try {
+      final fileMetadata = await driveApi.files.get(
+        file.id!,
+        $fields: 'id, name, webViewLink',
+      ) as drive.File;
+
+      if (fileMetadata.webViewLink == null) {
+        print("No webViewLink returned by API.");
+        return null;
+      }
+
+      // Optionally encode original path info as query parameters for your app
+      final shareableUri = Uri.parse(fileMetadata.webViewLink!).replace(
+        queryParameters: {
+          ...Uri.parse(fileMetadata.webViewLink!).queryParameters,
+          'originalPath': path,
+        },
+      );
+
+      return shareableUri;
+    } catch (e) {
+      print("Error getting shareable link: $e");
+      return null;
+    }
+  }
+
+
   @override
   Future<bool> logout() async {
     if (_isAuthenticated) {
@@ -521,5 +578,4 @@ class GoogleDriveProvider extends CloudStorageProvider {
       return false;
     }
   }
-
 }
