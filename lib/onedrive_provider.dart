@@ -286,4 +286,30 @@ class OneDriveProvider extends CloudStorageProvider {
           'Failed to upload file by ID: ${response.statusCode}, ${response.body}');
     }
   }
+
+  @override
+  Future<String?> loggedInUserDisplayName() async {
+    if (!_isAuthenticated) return null;
+
+    final accessToken = await DefaultTokenManager(
+      tokenEndpoint: OneDrive.tokenEndpoint,
+      clientID: client.clientID,
+      redirectURL: client.redirectURL,
+      scope: client.scopes,
+    ).getAccessToken();
+
+    if (accessToken == null || accessToken.isEmpty) return null;
+
+    final response = await http.get(
+      Uri.parse('https://graph.microsoft.com/v1.0/me'),
+      headers: {
+        'Authorization': 'Bearer $accessToken',
+      },
+    );
+
+    if (response.statusCode != 200) return null;
+
+    final json = jsonDecode(response.body);
+    return json['displayName'] as String?;
+  }
 }

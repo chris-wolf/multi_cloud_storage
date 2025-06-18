@@ -303,7 +303,7 @@ class DropboxProvider extends CloudStorageProvider {
     final file = File(path);
     await file.create(recursive: true);
     await file.writeAsBytes(data);
-    return file;
+    return file; 
   }
 
   @override
@@ -311,4 +311,30 @@ class DropboxProvider extends CloudStorageProvider {
     // TODO: implement uploadFileById
     throw UnimplementedError();
   }
+
+  @override
+  Future<String?> loggedInUserDisplayName() async {
+    if (!_isAuthenticated) {
+      throw Exception('Not authenticated');
+    }
+
+    final accessToken = await Dropbox.getAccessToken();
+
+    final response = await http.post(
+      Uri.parse('https://api.dropboxapi.com/2/users/get_current_account'),
+      headers: {
+        'Authorization': 'Bearer $accessToken',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      debugPrint('Failed to fetch user info: ${response.body}');
+      return null;
+    }
+
+    final json = jsonDecode(response.body);
+    return json['name']?['display_name'];
+  }
+
 }

@@ -24,8 +24,8 @@ class GoogleDriveProvider extends CloudStorageProvider {
   // Public accessor for the singleton instance
   static GoogleDriveProvider? get instance => _instance;
 
-
-   String? loggedInUserDisplayName() {
+  @override
+   Future<String?> loggedInUserDisplayName() async {
     return _googleSignIn?.currentUser?.displayName;
   }
 

@@ -1,5 +1,7 @@
 /// Abstract class defining the interface for cloud storage providers.
 abstract class CloudStorageProvider {
+
+  Future<String?> loggedInUserDisplayName();
   /// Uploads a file to the cloud storage.
   Future<String> uploadFile({
     required String localPath,
