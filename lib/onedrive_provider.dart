@@ -129,7 +129,7 @@ class OneDriveProvider extends CloudStorageProvider {
   }
 
   @override
-  Future<Uri?> generateSharableLinkWithMetadata(String path) async {
+  Future<Uri?> generateSharableLink(String path) async {
     if (!_isAuthenticated) {
       throw Exception('Not authenticated');
     }
@@ -207,6 +207,83 @@ class OneDriveProvider extends CloudStorageProvider {
       return false;
     } catch (e) {
       return e.toString().contains('401') ||  e.toString().contains('403');
+    }
+  }
+
+  @override
+  Future<String> getSharedFileById({
+    required String fileId,
+    required String localPath,
+  }) async {
+    if (!_isAuthenticated) {
+      throw Exception('Not authenticated');
+    }
+
+    final accessToken = await DefaultTokenManager(
+      tokenEndpoint: OneDrive.tokenEndpoint,
+      clientID: client.clientID,
+      redirectURL: client.redirectURL,
+      scope: client.scopes,
+    ).getAccessToken();
+
+    if (accessToken == null || accessToken.isEmpty) {
+      throw Exception('Access token is null or empty');
+    }
+
+    final response = await http.get(
+      Uri.parse('https://graph.microsoft.com/v1.0/shares/u!$fileId/root/content'),
+      headers: {
+        'Authorization': 'Bearer $accessToken',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+          'Failed to download shared file: ${response.statusCode}, ${response.body}');
+    }
+
+    final file = File(localPath);
+    await file.writeAsBytes(response.bodyBytes);
+    return localPath;
+  }
+
+  @override
+  Future<String> uploadFileById({
+    required String localPath,
+    required String fileId,
+    Map<String, dynamic>? metadata,
+  }) async {
+    if (!_isAuthenticated) {
+      throw Exception('Not authenticated');
+    }
+
+    final accessToken = await DefaultTokenManager(
+      tokenEndpoint: OneDrive.tokenEndpoint,
+      clientID: client.clientID,
+      redirectURL: client.redirectURL,
+      scope: client.scopes,
+    ).getAccessToken();
+
+    if (accessToken == null || accessToken.isEmpty) {
+      throw Exception('Access token is null or empty');
+    }
+
+    final fileBytes = await File(localPath).readAsBytes();
+
+    final response = await http.put(
+      Uri.parse('https://graph.microsoft.com/v1.0/me/drive/items/$fileId/content'),
+      headers: {
+        'Authorization': 'Bearer $accessToken',
+        'Content-Type': 'application/octet-stream',
+      },
+      body: fileBytes,
+    );
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return fileId;
+    } else {
+      throw Exception(
+          'Failed to upload file by ID: ${response.statusCode}, ${response.body}');
     }
   }
 }

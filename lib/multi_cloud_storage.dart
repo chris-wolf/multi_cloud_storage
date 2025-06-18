@@ -19,8 +19,8 @@ class MultiCloudStorage {
           redirectUri: redirectUri,
           accessToken: accessToken);
 
-  static Future<CloudStorageProvider?> connectToGoogleDrive() =>
-      GoogleDriveProvider.connect();
+  static Future<CloudStorageProvider?> connectToGoogleDrive({bool forceInteractive = false}) =>
+      GoogleDriveProvider.connect(forceInteractive: forceInteractive);
 
   static Future<CloudStorageProvider?> connectToOneDrive({
     required String clientId,

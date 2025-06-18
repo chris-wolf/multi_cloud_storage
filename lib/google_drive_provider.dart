@@ -24,6 +24,11 @@ class GoogleDriveProvider extends CloudStorageProvider {
   // Public accessor for the singleton instance
   static GoogleDriveProvider? get instance => _instance;
 
+
+   String? loggedInUserDisplayName() {
+    return _googleSignIn?.currentUser?.displayName;
+  }
+
   // Get an authenticated instance of GoogleDriveProvider
   // Tries silent sign-in first, then interactive if needed.
   static Future<GoogleDriveProvider?> connect(
@@ -101,12 +106,17 @@ class GoogleDriveProvider extends CloudStorageProvider {
 
   // Method to sign out
   static Future<void> signOut() async {
-    await _googleSignIn?.signOut(); // Sign out from GSI
-    await _googleSignIn
-        ?.disconnect(); // Disconnect to revoke tokens (optional, more thorough)
+    try {
+      await _googleSignIn?.disconnect(); // Revoke token
+      await _googleSignIn?.signOut();    // Sign out locally
+    } catch (e) {
+      print("GoogleDriveProvider: Sign out error - $e");
+    }
+
+    _googleSignIn = null;  // Clear scopes & cached state
     _instance?._isAuthenticated = false;
-    _instance = null; // Clear the instance
-    print("GoogleDriveProvider: User signed out.");
+    _instance = null;      // Reset the singleton
+    print("GoogleDriveProvider: User signed out and GoogleSignIn reset.");
   }
 
   void _checkAuth() {
@@ -163,6 +173,39 @@ class GoogleDriveProvider extends CloudStorageProvider {
     }
 
     return uploadedFile.id!;
+  }
+
+  Future<String> uploadFileById({
+    required String localPath,
+    required String fileId,
+    Map<String, dynamic>? metadata,
+  }) async {
+    _checkAuth();
+
+    final file = File(localPath);
+
+    final driveFile = drive.File(); // Metadata changes can be added here if needed
+
+    final media = drive.Media(file.openRead(), await file.length());
+    drive.File updatedFile;
+    try {
+      updatedFile = await driveApi.files.update(
+        driveFile,
+        fileId,
+        uploadMedia: media,
+        $fields: 'id',
+      );
+    } catch (e) {
+      print("Error uploading file: $e");
+      if (e is drive.DetailedApiRequestError &&
+          (e.status == 401 || e.status == 403)) {
+        print("Authentication error during upload. Attempting to reconnect...");
+        _isAuthenticated = false;
+      }
+      rethrow;
+    }
+
+    return updatedFile.id!;
   }
 
   @override
@@ -489,7 +532,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
   /// It creates a shareable link for a given file or folder path,
   /// and optionally returns metadata so the recipient can recreate the original folder structure.
   @override
-  Future<Uri?> generateSharableLinkWithMetadata(String path) async {
+  Future<Uri?> generateSharableLink(String path) async {
     _checkAuth();
 
     final drive.File? file = await _getFileByPath(path);
@@ -541,12 +584,17 @@ class GoogleDriveProvider extends CloudStorageProvider {
     }
   }
 
-
   @override
   Future<bool> logout() async {
     if (_isAuthenticated) {
-      await signOut();
-      return true;
+      try {
+        await signOut(); // Includes disconnect, signOut, and resets state
+        _isAuthenticated = false;
+        return true;
+      } catch (e) {
+        print("Logout failed: $e");
+        return false;
+      }
     }
     return false;
   }
@@ -577,5 +625,40 @@ class GoogleDriveProvider extends CloudStorageProvider {
       // Unknown error, assume token is still valid to be safe
       return false;
     }
+  }
+
+   Future<String> getSharedFileById({
+    required String fileId,
+    required String localPath,
+  }) async {
+    _checkAuth();
+
+    final output = File(localPath);
+    final sink = output.openWrite();
+
+    try {
+      final media = await driveApi.files.get(
+        fileId,
+        downloadOptions: drive.DownloadOptions.fullMedia,
+      ) as drive.Media; // Cast is important here
+
+      await media.stream.pipe(sink);
+      await sink.close();
+    } catch (e) {
+      await sink.close(); // Ensure sink is closed on error
+      // Delete partially downloaded file if an error occurs
+      if (await output.exists()) {
+        await output.delete();
+      }
+      print("Error downloading shared file by ID: $e");
+      if (e is drive.DetailedApiRequestError &&
+          (e.status == 401 || e.status == 403)) {
+        print("Authentication error during download. Attempting to reconnect...");
+        _isAuthenticated = false;
+      }
+      rethrow;
+    }
+
+    return localPath;
   }
 }

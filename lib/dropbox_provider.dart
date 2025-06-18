@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:dropbox_client/dropbox_client.dart';
@@ -154,18 +155,53 @@ class DropboxProvider extends CloudStorageProvider {
   }
 
   @override
+  @override
   Future<CloudFile> getFileMetadata(String path) async {
     if (!_isAuthenticated) {
       throw Exception('Not authenticated');
     }
 
-    // Note: The getMetadata method is not directly exposed in the package
-    // We'll need to implement this using the API directly
-    throw UnimplementedError('Get metadata functionality not implemented');
+    final accessToken = await Dropbox.getAccessToken();
+    final fixedPath = path.startsWith('/') ? path : '/$path';
+
+    final response = await http.post(
+      Uri.parse('https://api.dropboxapi.com/2/files/get_metadata'),
+      headers: {
+        'Authorization': 'Bearer $accessToken',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'path': fixedPath,
+        'include_media_info': false,
+        'include_deleted': false,
+        'include_has_explicit_shared_members': false,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to get file metadata: ${response.body}');
+    }
+
+    final metadata = jsonDecode(response.body);
+    final isFolder = metadata['.tag'] == 'folder';
+
+    return CloudFile(
+      path: metadata['path_display'] ?? '',
+      name: metadata['name'] ?? '',
+      size: metadata['size'] ?? 0,
+      modifiedTime: DateTime.tryParse(metadata['server_modified'] ?? '') ??
+          DateTime.now(),
+      isDirectory: isFolder,
+      metadata: {
+        'id': metadata['id'],
+        'tag': metadata['.tag'],
+      },
+    );
   }
 
+
   @override
-  Future<Uri?> generateSharableLinkWithMetadata(String path) async {
+  Future<Uri?> generateSharableLink(String path) async {
     if (!_isAuthenticated) {
       throw Exception('Not authenticated');
     }
@@ -232,5 +268,47 @@ class DropboxProvider extends CloudStorageProvider {
     if (!_isAuthenticated) return true;
     final token = await Dropbox.getAccessToken();
     return token == null || token.isEmpty;
+  }
+
+  @override
+  Future<String> getSharedFileById({
+    required String fileId,
+    required String localPath,
+  }) async {
+    if (!_isAuthenticated) {
+      throw Exception('Not authenticated');
+    }
+
+    final accessToken = await Dropbox.getAccessToken();
+
+    final response = await http.post(
+      Uri.parse('https://content.dropboxapi.com/2/sharing/get_shared_link_file'),
+      headers: {
+        'Authorization': 'Bearer $accessToken',
+        'Dropbox-API-Arg': jsonEncode({
+          'url': fileId, // Dropbox shared links act as file IDs
+        }),
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to download shared file: ${response.body}');
+    }
+
+    final file = await _writeToFile(response.bodyBytes, localPath);
+    return file.path;
+  }
+
+  Future<File> _writeToFile(Uint8List data, String path) async {
+    final file = File(path);
+    await file.create(recursive: true);
+    await file.writeAsBytes(data);
+    return file;
+  }
+
+  @override
+  Future<String> uploadFileById({required String localPath, required String fileId, Map<String, dynamic>? metadata}) {
+    // TODO: implement uploadFileById
+    throw UnimplementedError();
   }
 }
