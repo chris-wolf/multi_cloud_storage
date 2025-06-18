@@ -303,7 +303,7 @@ class DropboxProvider extends CloudStorageProvider {
     final file = File(path);
     await file.create(recursive: true);
     await file.writeAsBytes(data);
-    return file; 
+    return file;
   }
 
   @override

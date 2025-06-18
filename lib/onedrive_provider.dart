@@ -29,6 +29,9 @@ class OneDriveProvider extends CloudStorageProvider {
       throw ArgumentError(
           'App registration required: https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade');
     }
+    if (redirectUri.isEmpty) {
+      redirectUri = 'https://login.microsoftonline.com/common/oauth2/nativeclient'; //fallback to nativ
+    }
     final provider = OneDriveProvider._create(
         clientId: clientId, redirectUri: redirectUri, context: context);
     provider.client = OneDrive(

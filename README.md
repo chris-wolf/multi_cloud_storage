@@ -87,6 +87,11 @@ Add this to /android/app/src/main/AndroidManifest.xml inside the application blo
     - Click `New registration`.
     - For native apps set Redirect URI to `https://login.microsoftonline.com/common/oauth2/nativeclient` .
     - Obtain your `Client ID`.
+    - On the left side go to Manage -> API permissions
+    - Click add a Permission
+    - Selected "Delegated permission"
+    - Search for the Permissions your app needs like:
+      - Files.Read, Files.ReadWrite, Files.Read.All, Files.ReadWrite.All
 
 ---
 
