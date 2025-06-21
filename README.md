@@ -94,23 +94,21 @@ Add this to /android/app/src/main/AndroidManifest.xml inside the application blo
 ```xml
 <key>CFBundleURLTypes</key>
 <array>
-<dict>
-   <key>CFBundleURLName</key>
-   <string></string>
-   <key>CFBundleURLSchemes</key>
-   <array>
-      <string>db-DROPBOXKEY</string>
-   </array>
-</dict>
+    <dict>
+        <key>CFBundleURLName</key>
+        <string></string>
+        <key>CFBundleURLSchemes</key>
+        <array>
+            <string>db-DROPBOXKEY</string>
+        </array>
+    </dict>
 </array>
 
 <key>LSApplicationQueriesSchemes</key>
 <array>
-<string>dbapi-8-emm</string>
-<string>dbapi-2</string>
+    <string>dbapi-8-emm</string>
+    <string>dbapi-2</string>
 </array>
-
-
 ```
 
 
