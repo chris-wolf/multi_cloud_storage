@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:dropbox_client/dropbox_client.dart';
+import 'package:flutter/material.dart';
 import 'cloud_storage_provider.dart';
 import 'package:http/http.dart' as http;
 
@@ -36,6 +38,8 @@ class DropboxProvider extends CloudStorageProvider {
     } else {
       await Dropbox.authorizeWithAccessToken(accessToken);
     }
+    final lifecycleWaiter = _AppLifecycleWaiter();
+    await lifecycleWaiter.waitForResumed();
     if ((await Dropbox.getAccessToken()) == null) {
       return null;
     }
@@ -71,7 +75,7 @@ class DropboxProvider extends CloudStorageProvider {
     }
 
     await Dropbox.download(remotePath, localPath, (downloaded, total) {
-      debugPrint('Download progress: $downloaded / $total');
+        debugPrint('Download progress: $downloaded / $total');
     });
 
     return localPath;
@@ -337,4 +341,31 @@ class DropboxProvider extends CloudStorageProvider {
     return json['name']?['display_name'];
   }
 
+  @override
+  Future<String?> extractFileIdFromSharableLink(Uri shareLink) {
+    // TODO: implement extractFileIdFromSharableLink
+    throw UnimplementedError();
+  }
+
+}
+
+
+class _AppLifecycleWaiter with WidgetsBindingObserver {
+  final Completer<void> _resumedCompleter = Completer<void>();
+
+  _AppLifecycleWaiter() {
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  Future<void> waitForResumed() async {
+    return _resumedCompleter.future;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && !_resumedCompleter.isCompleted) {
+      _resumedCompleter.complete();
+      WidgetsBinding.instance.removeObserver(this);
+    }
+  }
 }

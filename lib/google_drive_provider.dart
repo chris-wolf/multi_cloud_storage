@@ -661,4 +661,12 @@ class GoogleDriveProvider extends CloudStorageProvider {
 
     return localPath;
   }
+
+
+  @override
+  Future<String?> extractFileIdFromSharableLink(Uri shareLink) async {
+    final regex = RegExp(r'd/([a-zA-Z0-9_-]+)');
+    final match = regex.firstMatch(shareLink.toString());
+    return match != null ? match.group(1)! : '';
+  }
 }

@@ -234,7 +234,7 @@ class OneDriveProvider extends CloudStorageProvider {
     }
 
     final response = await http.get(
-      Uri.parse('https://graph.microsoft.com/v1.0/shares/u!$fileId/root/content'),
+      Uri.parse('https://graph.microsoft.com/v1.0/me/drive/items/$fileId/content'),
       headers: {
         'Authorization': 'Bearer $accessToken',
       },
@@ -242,7 +242,7 @@ class OneDriveProvider extends CloudStorageProvider {
 
     if (response.statusCode != 200) {
       throw Exception(
-          'Failed to download shared file: ${response.statusCode}, ${response.body}');
+          'Failed to download file by item ID: ${response.statusCode}, ${response.body}');
     }
 
     final file = File(localPath);
@@ -288,6 +288,37 @@ class OneDriveProvider extends CloudStorageProvider {
       throw Exception(
           'Failed to upload file by ID: ${response.statusCode}, ${response.body}');
     }
+  }
+
+  @override
+  Future<String?> extractFileIdFromSharableLink(Uri shareLink) async {
+    final accessToken = await DefaultTokenManager(
+      tokenEndpoint: OneDrive.tokenEndpoint,
+      clientID: client.clientID,
+      redirectURL: client.redirectURL,
+      scope: client.scopes,
+    ).getAccessToken();
+    final encoded = encodeShareUrl(shareLink);
+
+    final response = await http.get(
+      Uri.parse('https://graph.microsoft.com/v1.0/shares/u!$encoded/driveItem'),
+      headers: {
+        'Authorization': 'Bearer $accessToken',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final json = jsonDecode(response.body);
+      return json['id']; // actual OneDrive item ID
+    } else {
+      throw Exception('Failed to resolve item ID: ${response.statusCode}, ${response.body}');
+    }
+  }
+
+  String encodeShareUrl(Uri url) {
+    final bytes = utf8.encode(url.toString());
+    final base64Str = base64UrlEncode(bytes);
+    return base64Str.replaceAll('=', '');
   }
 
   @override

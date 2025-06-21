@@ -45,6 +45,8 @@ abstract class CloudStorageProvider {
 
   Future<Uri?> generateSharableLink(String path);
 
+  Future<String?> extractFileIdFromSharableLink(Uri shareLink);
+
   Future<String> getSharedFileById({
     required String fileId,
     required String localPath,
