@@ -10,8 +10,7 @@ import 'package:permission_handler/permission_handler.dart';
 class CloudStorageExplorerPage extends StatefulWidget {
   final CloudStorageProvider cloudStorageProvider;
 
-  const CloudStorageExplorerPage({Key? key, required this.cloudStorageProvider})
-      : super(key: key);
+  const CloudStorageExplorerPage({super.key, required this.cloudStorageProvider});
 
   @override
   _CloudStorageExplorerPageState createState() =>

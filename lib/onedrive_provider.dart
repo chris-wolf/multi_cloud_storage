@@ -25,12 +25,12 @@ class OneDriveProvider extends CloudStorageProvider {
     required String redirectUri,
     required BuildContext context,
   }) async {
-    if (clientId.trim().isEmpty && redirectUri.trim().isEmpty) {
+    if (clientId.trim().isEmpty) {
       throw ArgumentError(
           'App registration required: https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade');
     }
     if (redirectUri.isEmpty) {
-      redirectUri = 'https://login.microsoftonline.com/common/oauth2/nativeclient'; //fallback to nativ
+      redirectUri = 'https://login.microsoftonline.com/common/oauth2/nativeclient'; //fallback: use native redirect
     }
     final provider = OneDriveProvider._create(
         clientId: clientId, redirectUri: redirectUri, context: context);
@@ -142,9 +142,9 @@ class OneDriveProvider extends CloudStorageProvider {
       clientID: client.clientID,
       redirectURL: client.redirectURL,
       scope: client.scopes,
-    ).getAccessToken(); //accesToken is private so need to access it like this
+    ).getAccessToken(); 
     if (accessToken == null || accessToken.isEmpty) {
-      print("OneDriveProvider: No access token available.");
+      debugPrint("OneDriveProvider: No access token available.");
       return null;
     }
 
@@ -165,14 +165,14 @@ class OneDriveProvider extends CloudStorageProvider {
       );
 
       if (response.statusCode != 200) {
-        print("OneDriveProvider: Failed to create shareable link: ${response.body}");
+        debugPrint("OneDriveProvider: Failed to create shareable link: ${response.body}");
         return null;
       }
 
       final json = jsonDecode(response.body);
       final link = json['link']?['webUrl'];
       if (link == null) {
-        print("OneDriveProvider: No shareable link returned.");
+        debugPrint("OneDriveProvider: No shareable link returned.");
         return null;
       }
 
@@ -186,7 +186,7 @@ class OneDriveProvider extends CloudStorageProvider {
 
       return shareableUri;
     } catch (e) {
-      print("OneDriveProvider: Error creating shareable link: $e");
+      debugPrint("OneDriveProvider: Error creating shareable link: $e");
       return null;
     }
   }

@@ -35,7 +35,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
       {bool forceInteractive = false}) async {
     // If already connected and not forcing interactive, return existing instance
     if (_instance != null && _instance!._isAuthenticated && !forceInteractive) {
-      print("GoogleDriveProvider: Already connected.");
+      debugPrint("GoogleDriveProvider: Already connected.");
       return _instance;
     }
 
@@ -59,44 +59,44 @@ class GoogleDriveProvider extends CloudStorageProvider {
 
     try {
       if (!forceInteractive) {
-        print("GoogleDriveProvider: Attempting silent sign-in...");
+        debugPrint("GoogleDriveProvider: Attempting silent sign-in...");
         account = await _googleSignIn!.signInSilently();
       }
 
       if (account == null) {
-        print(
+        debugPrint(
             "GoogleDriveProvider: Silent sign-in failed or interactive forced. Attempting interactive sign-in...");
         account = await _googleSignIn!.signIn();
         if (account == null) {
-          print("GoogleDriveProvider: Interactive sign-in cancelled by user.");
+          debugPrint("GoogleDriveProvider: Interactive sign-in cancelled by user.");
           _instance?._isAuthenticated =
               false; // Ensure state is false if it was previously true
           return null; // User cancelled
         }
       }
-      print("GoogleDriveProvider: Sign-in successful for ${account.email}.");
+      debugPrint("GoogleDriveProvider: Sign-in successful for ${account.email}.");
 
       // Get the AuthClient from the extension
       client = await _googleSignIn!.authenticatedClient();
 
       if (client == null) {
-        print(
+        debugPrint(
             "GoogleDriveProvider: Failed to get authenticated client. User might not be signed in or credentials issue.");
         await signOut(); // Sign out to clear any problematic state
         _instance?._isAuthenticated = false;
         return null;
       }
 
-      print("GoogleDriveProvider: Authenticated client obtained.");
+      debugPrint("GoogleDriveProvider: Authenticated client obtained.");
       final provider = _instance ?? GoogleDriveProvider._create();
       provider.driveApi = drive.DriveApi(client);
       provider._isAuthenticated = true;
       _instance = provider;
       return _instance;
     } catch (error, stackTrace) {
-      print(
+      debugPrint(
           'GoogleDriveProvider: Error during sign-in or client retrieval: $error');
-      print(stackTrace);
+      debugPrint(stackTrace);
       _instance?._isAuthenticated = false;
       // Optionally sign out if a severe error occurs
       // await signOut();
@@ -110,13 +110,13 @@ class GoogleDriveProvider extends CloudStorageProvider {
       await _googleSignIn?.disconnect(); // Revoke token
       await _googleSignIn?.signOut();    // Sign out locally
     } catch (e) {
-      print("GoogleDriveProvider: Sign out error - $e");
+      debugPrint("GoogleDriveProvider: Sign out error - $e");
     }
 
     _googleSignIn = null;  // Clear scopes & cached state
     _instance?._isAuthenticated = false;
     _instance = null;      // Reset the singleton
-    print("GoogleDriveProvider: User signed out and GoogleSignIn reset.");
+    debugPrint("GoogleDriveProvider: User signed out and GoogleSignIn reset.");
   }
 
   void _checkAuth() {
@@ -158,11 +158,11 @@ class GoogleDriveProvider extends CloudStorageProvider {
       uploadedFile = await driveApi.files
           .create(driveFile, uploadMedia: media, $fields: 'id');
     } catch (e) {
-      print("Error uploading file: $e");
+      debugPrint("Error uploading file: $e");
       // Check for auth-related errors here if needed, though the client should refresh
       if (e is drive.DetailedApiRequestError &&
           (e.status == 401 || e.status == 403)) {
-        print("Authentication error during upload. Attempting to reconnect...");
+        debugPrint("Authentication error during upload. Attempting to reconnect...");
         _isAuthenticated = false; // Mark as unauthenticated
         // Optionally try to reconnect or notify user
         // await connect(forceInteractive: true);
@@ -175,6 +175,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
     return uploadedFile.id!;
   }
 
+  @override
   Future<String> uploadFileById({
     required String localPath,
     required String fileId,
@@ -196,10 +197,10 @@ class GoogleDriveProvider extends CloudStorageProvider {
         $fields: 'id',
       );
     } catch (e) {
-      print("Error uploading file: $e");
+      debugPrint("Error uploading file: $e");
       if (e is drive.DetailedApiRequestError &&
           (e.status == 401 || e.status == 403)) {
-        print("Authentication error during upload. Attempting to reconnect...");
+        debugPrint("Authentication error during upload. Attempting to reconnect...");
         _isAuthenticated = false;
       }
       rethrow;
@@ -237,10 +238,10 @@ class GoogleDriveProvider extends CloudStorageProvider {
       if (await output.exists()) {
         await output.delete();
       }
-      print("Error downloading file: $e");
+      debugPrint("Error downloading file: $e");
       if (e is drive.DetailedApiRequestError &&
           (e.status == 401 || e.status == 403)) {
-        print(
+        debugPrint(
             "Authentication error during download. Attempting to reconnect...");
         _isAuthenticated = false;
       }
@@ -260,7 +261,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
 
     final folder = await _getFolderByPath(path);
     if (folder == null || folder.id == null) {
-      print("GoogleDriveProvider: Folder not found at $path");
+      debugPrint("GoogleDriveProvider: Folder not found at $path");
       return [];
     }
 
@@ -359,11 +360,11 @@ class GoogleDriveProvider extends CloudStorageProvider {
       try {
         await driveApi.files.delete(file.id!);
       } catch (e) {
-        print("Error deleting file: $e");
+        debugPrint("Error deleting file: $e");
         rethrow;
       }
     } else {
-      print("GoogleDriveProvider: File/Folder to delete not found at $path");
+      debugPrint("GoogleDriveProvider: File/Folder to delete not found at $path");
       // Optionally throw an exception if not found behavior is critical
       // throw Exception('File not found for deletion: $path');
     }
@@ -416,8 +417,9 @@ class GoogleDriveProvider extends CloudStorageProvider {
     // Normalize path: remove leading/trailing slashes for consistent splitting
     final normalizedPath =
         filePath.replaceAll(RegExp(r'^/+'), '').replaceAll(RegExp(r'/+$'), '');
-    if (normalizedPath.isEmpty)
+    if (normalizedPath.isEmpty) {
       return _getRootFolder(); // If path was only slashes
+    }
 
     final parts = split(normalizedPath);
     drive.File currentFolder = await _getRootFolder();
@@ -427,7 +429,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
       if (folderName.isEmpty) continue; // Should not happen with normalizedPath
       final folder = await _getFolderByName(currentFolder.id!, folderName);
       if (folder == null) {
-        print(
+        debugPrint(
             "GoogleDriveProvider: Intermediate folder '$folderName' not found in path '$filePath'");
         return null;
       }
@@ -473,9 +475,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
       if (part.isEmpty) continue; // Should not happen with normalizedPath
 
       var folder = await _getFolderByName(currentFolder.id!, part);
-      if (folder == null) {
-        folder = await _createFolder(currentFolder.id!, part);
-      }
+      folder ??= await _createFolder(currentFolder.id!, part);
       currentFolder = folder;
     }
     return currentFolder;
@@ -537,7 +537,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
 
     final drive.File? file = await _getFileByPath(path);
     if (file == null || file.id == null) {
-      print("GoogleDriveProvider: File not found at $path");
+      debugPrint("GoogleDriveProvider: File not found at $path");
       return null;
     }
 
@@ -553,7 +553,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
         $fields: 'id',
       );
     } catch (e) {
-      print("Error setting permission for sharing: $e");
+      debugPrint("Error setting permission for sharing: $e");
       return null;
     }
 
@@ -565,7 +565,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
       ) as drive.File;
 
       if (fileMetadata.webViewLink == null) {
-        print("No webViewLink returned by API.");
+        debugPrint("No webViewLink returned by API.");
         return null;
       }
 
@@ -579,7 +579,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
 
       return shareableUri;
     } catch (e) {
-      print("Error getting shareable link: $e");
+      debugPrint("Error getting shareable link: $e");
       return null;
     }
   }
@@ -592,7 +592,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
         _isAuthenticated = false;
         return true;
       } catch (e) {
-        print("Logout failed: $e");
+        debugPrint("Logout failed: $e");
         return false;
       }
     }
@@ -627,7 +627,8 @@ class GoogleDriveProvider extends CloudStorageProvider {
     }
   }
 
-   Future<String> getSharedFileById({
+   @override
+  Future<String> getSharedFileById({
     required String fileId,
     required String localPath,
   }) async {
@@ -650,10 +651,10 @@ class GoogleDriveProvider extends CloudStorageProvider {
       if (await output.exists()) {
         await output.delete();
       }
-      print("Error downloading shared file by ID: $e");
+      debugPrint("Error downloading shared file by ID: $e");
       if (e is drive.DetailedApiRequestError &&
           (e.status == 401 || e.status == 403)) {
-        print("Authentication error during download. Attempting to reconnect...");
+        debugPrint("Authentication error during download. Attempting to reconnect...");
         _isAuthenticated = false;
       }
       rethrow;
