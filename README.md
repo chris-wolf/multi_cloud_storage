@@ -41,17 +41,31 @@ flutter pub get
 
 ## Cloud Providers Setup
 
+
+### Google Drive
+
+1. **Setup Google Drive API**:
+
+   - Go to [Google Cloud Console Credentials](https://console.cloud.google.com/apis/credentials).
+   - Create Credentials -> OAuth client ID. ()
+   - Select "Android", "iOS", or "Web" based on your needs. (Make sure all data is correct for your app or else it won't work)
+
+
 ### Dropbox
 
 1. **Register Your App**:
-    - Visit [Dropbox App Console](https://www.dropbox.com/developers/apps).
-    - Click "Create app".
-    - Select Scoped access and appropriate access type (`app folder` or `full Dropbox`).
-    - Generate access token for testing (user login doesn't work while app is Status: Development)
-    - Obtain your `App Key`, `App Secret` and `Access Token`.
-    - Set Redirect URI (OAuth), not required for mobile apps.
-
-
+   - Visit [Dropbox App Console](https://www.dropbox.com/developers/apps).
+   - Click "Create app".
+   - Select Scoped access and appropriate access type (`app folder` or `full Dropbox`).
+   - Obtain your `App Key`, `App Secret` and `Access Token`.
+   - Set Redirect URI (OAuth), not required for mobile apps.
+   - Under Permissions tab select the following permissions:
+      - files.metadata.read
+      - files.metadata.write
+      - files.content.read
+      - files.content.write
+`
+`
 #### Android
 Add this to /android/app/src/main/AndroidManifest.xml inside the application bloc and replace YOUR_APP_KEY with the appKey:
 
@@ -71,13 +85,69 @@ Add this to /android/app/src/main/AndroidManifest.xml inside the application blo
         </activity>
 ```  
 
-### Google Drive
 
-1. **Setup Google Drive API**:
+#### iOS/MacOS
 
-    - Go to [Google Cloud Console Credentials](https://console.cloud.google.com/apis/credentials).
-    - Create Credentials -> OAuth client ID. ()
-    - Select "Android", "iOS", or "Web" based on your needs. (Make sure all data is correct for your app or else it won't work)
+### 1. Add the following to `Info.plist`
+**(Replace `DROPBOXKEY` with your actual Dropbox key):**
+
+```xml
+        <key>CFBundleURLTypes</key>
+<array>
+<dict>
+   <key>CFBundleURLSchemes</key>
+   <array>
+      <string>db-DROPBOXKEY</string>
+   </array>
+   <key>CFBundleURLName</key>
+   <string></string>
+</dict>
+</array>
+        <key>LSApplicationQueriesSchemes</key>
+          <array>
+              <string>dbapi-8-emm</string>
+              <string>dbapi-2</string>
+          </array>
+
+```
+
+
+2**Add below code to AppDelegate.swift**:
+
+```swift
+        import ObjectiveDropboxOfficial
+
+        // should be inside AppDelegate class
+        override func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
+          if let authResult = DBClientsManager.handleRedirectURL(url) {
+              if authResult.isSuccess() {
+                  print("dropbox auth success")
+              } else if (authResult.isCancel()) {
+                  print("dropbox auth cancel")
+              } else if (authResult.isError()) {
+                  print("dropbox auth error \(authResult.errorDescription)")
+              }
+          }
+          return true
+        }
+
+        // if your are linked with ObjectiveDropboxOfficial 6.x use below code instead
+
+        override func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
+          DBClientsManager.handleRedirectURL(url, completion:{ (authResult) in
+            if let authResult = authResult {
+                if authResult.isSuccess() {
+                    print("dropbox auth success")
+                } else if (authResult.isCancel()) {
+                    print("dropbox auth cancel")
+                } else if (authResult.isError()) {
+                    print("dropbox auth error \(authResult.errorDescription)")
+                }
+            }
+          });
+          return true
+        }
+```
 
 ### OneDrive
 
