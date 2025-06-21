@@ -64,8 +64,8 @@ flutter pub get
       - files.metadata.write
       - files.content.read
       - files.content.write
-`
-`
+
+
 #### Android
 Add this to /android/app/src/main/AndroidManifest.xml inside the application bloc and replace YOUR_APP_KEY with the appKey:
 
@@ -92,22 +92,24 @@ Add this to /android/app/src/main/AndroidManifest.xml inside the application blo
 **(Replace `DROPBOXKEY` with your actual Dropbox key):**
 
 ```xml
-        <key>CFBundleURLTypes</key>
+<key>CFBundleURLTypes</key>
 <array>
 <dict>
+   <key>CFBundleURLName</key>
+   <string></string>
    <key>CFBundleURLSchemes</key>
    <array>
       <string>db-DROPBOXKEY</string>
    </array>
-   <key>CFBundleURLName</key>
-   <string></string>
 </dict>
 </array>
-        <key>LSApplicationQueriesSchemes</key>
-          <array>
-              <string>dbapi-8-emm</string>
-              <string>dbapi-2</string>
-          </array>
+
+<key>LSApplicationQueriesSchemes</key>
+<array>
+<string>dbapi-8-emm</string>
+<string>dbapi-2</string>
+</array>
+
 
 ```
 
