@@ -59,7 +59,7 @@ class DropboxProvider extends CloudStorageProvider {
     }
 
     await Dropbox.upload(localPath, remotePath, (uploaded, total) {
-      debugdebugPrint('Upload progress: $uploaded / $total');
+      debugPrint('Upload progress: $uploaded / $total');
     });
 
     return remotePath;
@@ -75,7 +75,7 @@ class DropboxProvider extends CloudStorageProvider {
     }
 
     await Dropbox.download(remotePath, localPath, (downloaded, total) {
-        debugdebugPrint('Download progress: $downloaded / $total');
+        debugPrint('Download progress: $downloaded / $total');
     });
 
     return localPath;
@@ -333,7 +333,7 @@ class DropboxProvider extends CloudStorageProvider {
     );
 
     if (response.statusCode != 200) {
-      debugdebugPrint('Failed to fetch user info: ${response.body}');
+      debugPrint('Failed to fetch user info: ${response.body}');
       return null;
     }
 
