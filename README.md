@@ -55,6 +55,23 @@ flutter pub get
    - Select "Android", "iOS", or "Web" based on your needs. (Make sure all data is correct for your app or else it won't work)
 
 
+### OneDrive
+
+1. **Register Your App**:
+
+    - Go to [Azure Portal App registration](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade).
+    - Click `New registration`.
+    - For native apps set Redirect URI to `https://login.microsoftonline.com/common/oauth2/nativeclient` .
+    - Obtain your `Client ID`.
+    - Selected Manage -> "API Permissons"
+    - Add the Microsoft Graph Permissions your app needs:
+      - Files.Read
+      - Files.ReadWrite
+      - Files.Read.All
+      - Files.ReadWrite.All
+
+
+
 ### Dropbox
 
 1. **Register Your App**:
@@ -63,7 +80,7 @@ flutter pub get
    - Select Scoped access and appropriate access type (`app folder` or `full Dropbox`).
    - Click`Enable additonal users` to let other accounts authenticate.
    - Obtain your `App Key`, `App Secret`.
-   - Add a redirect URI, like `sample://auth.my.app` (use a custom one to prevent conflicts with other apps) 
+   - Add a redirect URI, like `sample://auth.my.app` (use a custom one to prevent conflicts with other apps)
    - Under Permissions tab select the following permissions:
       - files.metadata.read
       - files.metadata.write
@@ -72,7 +89,7 @@ flutter pub get
 
 
 #### Android
-### Add this to /android/app/src/main/AndroidManifest.xml inside you MainActivity bloc
+#### Add this to /android/app/src/main/AndroidManifest.xml inside you MainActivity bloc
 **(Replace `sample` and `auth.my.app` with your redirect URI defined above)**
 
 ```xml
@@ -89,8 +106,7 @@ flutter pub get
 
 
 #### iOS/MacOS
-
-### Add the following to `Info.plist` in your ios/macOs folder: runner/Info.plist
+#### Add the following to `Info.plist` in your ios/macOs folder: runner/Info.plist
 **(Replace `sample` with your redirect URI defined above)**
 
 ```xml
@@ -107,21 +123,6 @@ flutter pub get
 
 #### Other platforms are untested but should work when following app_links documentation: https://pub.dev/packages/app_links
 
-
-### OneDrive
-
-1. **Register Your App**:
-
-    - Go to [Azure Portal App registration](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade).
-    - Click `New registration`.
-    - For native apps set Redirect URI to `https://login.microsoftonline.com/common/oauth2/nativeclient` .
-    - Obtain your `Client ID`.
-    - Selected Manage -> "API Permissons"
-    - Add the Microsoft Graph Permissions your app needs:
-      - Files.Read
-      - Files.ReadWrite
-      - Files.Read.All
-      - Files.ReadWrite.All
 
 ---
 
