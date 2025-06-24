@@ -2,6 +2,7 @@
 
 A Flutter plugin that provides a unified API for interacting with multiple cloud storage providers including Dropbox, Google Drive, and OneDrive.
 
+> ⚠️ **Disclaimer:** This package is in active development. Breaking changes may occur, and certain features or platforms may be incomplete or untested. Use with caution in production.
 
 
 ## Features
@@ -15,11 +16,14 @@ A Flutter plugin that provides a unified API for interacting with multiple cloud
 
 ## Supported Platforms
 
-| Service       | Android | iOS | Mac  | Windows |
-| ------------- |:-------:|:---:|:----:|:-------:|
-| OneDrive      |    ✅    | ✅  | ✅   |   ✅    |
-| Google Drive  |    ✅    | ✅  | ✅   |   ❌    |
-| Dropbox       |    ✅    | ✅  | ❌   |   ❌    |
+| Service       | Android | iOS | Mac  | Windows | Linux |
+| ------------- |:-------:|:---:|:----:|:-------:|:-----:|
+| OneDrive      |    ✅    | ✅  | ⚠️   |   ⚠️    |  ❌   |
+| Google Drive  |    ✅    | ✅  | ⚠️   |   ❌    |  ❌   |
+| Dropbox       |    ✅    | ✅  | ⚠️   |   ⚠️    |  ⚠️   |
+
+⚠️ = Still untested, but should work.
+
 ---
 
 ## Installation
@@ -100,6 +104,8 @@ flutter pub get
 </dict>
 </array>
 ```
+
+#### Other platforms are untested but should work when following app_links documentation: https://pub.dev/packages/app_links
 
 
 ### OneDrive

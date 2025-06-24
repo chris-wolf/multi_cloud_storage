@@ -1,3 +1,13 @@
+## 0.5.0
+
+* Rewrote dropbox integration to use api instead of dropbox sdk (that caused issues when using dropbox web login)
+* Added logout function
+* Added tokenExpired check
+* Added sharing file functionality
+* Added displayName function of logged in user
+* Fixed Dropbox login (didn't wait till login completed before getting access token)
+* Added Dropbox readme for iOS/MacOS
+
 ## 0.4.0
 
 * Rewrote google authentication to not expire (old version was expiring after one hour)
