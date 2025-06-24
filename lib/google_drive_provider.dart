@@ -154,7 +154,8 @@ class GoogleDriveProvider extends CloudStorageProvider {
 
     if (existingFile != null && existingFile.id != null) {
       // If the file exists, update it using its ID.
-      debugPrint("GoogleDriveProvider: Found existing file at '$remotePath'. Updating it.");
+      debugPrint(
+          "GoogleDriveProvider: Found existing file at '$remotePath'. Updating it.");
       return uploadFileById(
         localPath: localPath,
         fileId: existingFile.id!,
@@ -162,7 +163,8 @@ class GoogleDriveProvider extends CloudStorageProvider {
       );
     } else {
       // If the file does not exist, create it.
-      debugPrint("GoogleDriveProvider: No file at '$remotePath'. Creating a new one.");
+      debugPrint(
+          "GoogleDriveProvider: No file at '$remotePath'. Creating a new one.");
       final file = File(localPath);
       final fileName = basename(remotePath);
       final remoteDir = dirname(remotePath) == '.' ? '' : dirname(remotePath);
@@ -177,7 +179,8 @@ class GoogleDriveProvider extends CloudStorageProvider {
       try {
         uploadedFile = await driveApi.files
             .create(driveFile, uploadMedia: media, $fields: 'id, name');
-        debugPrint("GoogleDriveProvider: Created new file '${uploadedFile.name}' with ID '${uploadedFile.id}'.");
+        debugPrint(
+            "GoogleDriveProvider: Created new file '${uploadedFile.name}' with ID '${uploadedFile.id}'.");
       } catch (e) {
         debugPrint("Error creating file during upload: $e");
         if (e is drive.DetailedApiRequestError &&
