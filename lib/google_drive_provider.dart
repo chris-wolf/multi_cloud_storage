@@ -149,35 +149,48 @@ class GoogleDriveProvider extends CloudStorageProvider {
   }) async {
     _checkAuth();
 
-    final file = File(localPath);
-    final fileName = basename(remotePath);
-    // Ensure the remote path is relative to the root (or appDataFolder)
-    final remoteDir = dirname(remotePath) == '.' ? '' : dirname(remotePath);
-    final folder = await _getOrCreateFolder(remoteDir);
+    // First, check if a file already exists at the given path.
+    final existingFile = await _getFileByPath(remotePath);
 
-    final driveFile = drive.File()
-      ..name = fileName
-      ..parents = [folder.id!];
+    if (existingFile != null && existingFile.id != null) {
+      // If the file exists, update it using its ID.
+      debugPrint("GoogleDriveProvider: Found existing file at '$remotePath'. Updating it.");
+      return uploadFileById(
+        localPath: localPath,
+        fileId: existingFile.id!,
+        metadata: metadata,
+      );
+    } else {
+      // If the file does not exist, create it.
+      debugPrint("GoogleDriveProvider: No file at '$remotePath'. Creating a new one.");
+      final file = File(localPath);
+      final fileName = basename(remotePath);
+      final remoteDir = dirname(remotePath) == '.' ? '' : dirname(remotePath);
+      final folder = await _getOrCreateFolder(remoteDir);
 
-    final media = drive.Media(file.openRead(), await file.length());
-    drive.File uploadedFile;
-    try {
-      uploadedFile = await driveApi.files
-          .create(driveFile, uploadMedia: media, $fields: 'id');
-    } catch (e) {
-      debugPrint("Error uploading file: $e");
-      // The authenticated client should handle token refreshes.
-      // If an error still occurs, it might be a permissions issue.
-      if (e is drive.DetailedApiRequestError &&
-          (e.status == 401 || e.status == 403)) {
-        debugPrint(
-            "Authentication error during upload. The user may not have permission, or the token is invalid.");
-        _isAuthenticated = false; // Mark as unauthenticated
+      final driveFile = drive.File()
+        ..name = fileName
+        ..parents = [folder.id!];
+
+      final media = drive.Media(file.openRead(), await file.length());
+      drive.File uploadedFile;
+      try {
+        uploadedFile = await driveApi.files
+            .create(driveFile, uploadMedia: media, $fields: 'id, name');
+        debugPrint("GoogleDriveProvider: Created new file '${uploadedFile.name}' with ID '${uploadedFile.id}'.");
+      } catch (e) {
+        debugPrint("Error creating file during upload: $e");
+        if (e is drive.DetailedApiRequestError &&
+            (e.status == 401 || e.status == 403)) {
+          debugPrint(
+              "Authentication error during create. The user may not have permission, or the token is invalid.");
+          _isAuthenticated = false;
+        }
+        rethrow;
       }
-      rethrow;
-    }
 
-    return uploadedFile.id!;
+      return uploadedFile.id!;
+    }
   }
 
   @override
