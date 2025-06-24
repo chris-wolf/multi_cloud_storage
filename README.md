@@ -60,10 +60,10 @@ flutter pub get
 - Open the ios project in xCode (/ios/Runner.xcworkspace)
 - Drag and drop GoogleService-Info.plist into Runner/Runner/
 - Click on GoogleService-Info.plist and press the two arrows top right to see the code
-- Copy the values of CLIENT_ID and REVERSED_CLIENT_ID into Info.plist inside the dict block, it should look similar to this:
+- Copy the values of CLIENT_ID and REVERSED_CLIENT_ID into Info.plist inside the dict block:
 ```xml
 <key>GIDClientID</key>
-<string>777610123509-lnl76p3pfq343v7l7vtur95l239trgku.apps.googleusercontent.com</string>
+<string>YOUR_CLIENT_ID.apps.googleusercontent.com</string>
 <key>CFBundleURLTypes</key>
 <array>
 <dict>
@@ -71,7 +71,7 @@ flutter pub get
    <string>Editor</string>
    <key>CFBundleURLSchemes</key>
    <array>
-      <string>com.googleusercontent.apps.777610123509-lnl76p3pfq343v7l7vtur95l239trgku</string>
+      <string>com.googleusercontent.apps.YOUR_REVERSED_CLIENT_ID</string>
    </array>
 </dict>
 </array>
