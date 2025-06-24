@@ -95,6 +95,12 @@ class _CloudStorageExplorerPageState extends State<CloudStorageExplorerPage> {
     }
   }
 
+
+  Future<void> _logout() async {
+    await widget.cloudStorageProvider.logout();
+    Navigator.pop(context);
+  }
+
   Future<void> _createDirectory() async {
     final controller = TextEditingController();
     showDialog(
@@ -171,6 +177,11 @@ class _CloudStorageExplorerPageState extends State<CloudStorageExplorerPage> {
           appBar: AppBar(
             title: Text('Cloud Explorer: $currentPath'),
             actions: [
+              IconButton(
+                icon: Icon(Icons.logout),
+                onPressed: _logout,
+                tooltip: 'Logout',
+              ),
               IconButton(
                 icon: Icon(Icons.create_new_folder),
                 onPressed: _createDirectory,

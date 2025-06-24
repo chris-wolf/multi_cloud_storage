@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:multi_cloud_storage/google_drive_provider.dart';
 import 'package:multi_cloud_storage/onedrive_provider.dart';
+import 'package:multi_cloud_storage/cloud_storage_provider.dart';
 
 import 'cloud_storage_provider.dart';
 import 'dropbox_provider.dart';
@@ -11,13 +12,11 @@ class MultiCloudStorage {
   static Future<CloudStorageProvider?> connectToDropbox(
           {required String appKey,
           required String appSecret,
-          required String redirectUri,
-          String? accessToken}) =>
+            required String redirectUri}) =>
       DropboxProvider.connect(
           appKey: appKey,
           appSecret: appSecret,
-          redirectUri: redirectUri,
-          accessToken: accessToken);
+          redirectUri: redirectUri);
 
   static Future<CloudStorageProvider?> connectToGoogleDrive({bool forceInteractive = false}) =>
       GoogleDriveProvider.connect(forceInteractive: forceInteractive);

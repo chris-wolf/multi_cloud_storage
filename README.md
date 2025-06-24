@@ -57,8 +57,9 @@ flutter pub get
    - Visit [Dropbox App Console](https://www.dropbox.com/developers/apps).
    - Click "Create app".
    - Select Scoped access and appropriate access type (`app folder` or `full Dropbox`).
-   - Obtain your `App Key`, `App Secret` and `Access Token`.
-   - Set Redirect URI (OAuth), not required for mobile apps.
+   - Click`Enable additonal users` to let other accounts authenticate.
+   - Obtain your `App Key`, `App Secret`.
+   - Add a redirect URI, like `sample://auth.my.app` (use a custom one to prevent conflicts with other apps) 
    - Under Permissions tab select the following permissions:
       - files.metadata.read
       - files.metadata.write
@@ -67,87 +68,39 @@ flutter pub get
 
 
 #### Android
-Add this to /android/app/src/main/AndroidManifest.xml inside the application bloc and replace YOUR_APP_KEY with the appKey:
+### Add this to /android/app/src/main/AndroidManifest.xml inside you MainActivity bloc
+**(Replace `sample` and `auth.my.app` with your redirect URI defined above)**
 
 ```xml
-        <!-- Add Dropbox Auth Activity -->
-        <activity
-            android:name="com.dropbox.core.android.AuthActivity"
-            android:exported="true"
-            android:launchMode="singleTask">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:scheme="db-YOUR_APP_KEY"  />
-            </intent-filter>
-        </activity>
+<!-- Deep Link for dropbox auth result -->
+<intent-filter>
+   <action android:name="android.intent.action.VIEW" />
+   <category android:name="android.intent.category.DEFAULT" />
+   <category android:name="android.intent.category.BROWSABLE" />
+   <!-- Add optional android:host to distinguish your app
+         from others in case of conflicting scheme name -->
+   <data android:scheme="sample" android:host="auth.my.app" />
+</intent-filter>
 ```  
 
 
 #### iOS/MacOS
 
-### 1. Add the following to `Info.plist`
-**(Replace `DROPBOXKEY` with your actual Dropbox key):**
+### Add the following to `Info.plist` in your ios/macOs folder: runner/Info.plist
+**(Replace `sample` with your redirect URI defined above)**
 
 ```xml
 <key>CFBundleURLTypes</key>
 <array>
-    <dict>
-        <key>CFBundleURLName</key>
-        <string></string>
-        <key>CFBundleURLSchemes</key>
-        <array>
-            <string>db-DROPBOXKEY</string>
-        </array>
-    </dict>
-</array>
-
-<key>LSApplicationQueriesSchemes</key>
-<array>
-    <string>dbapi-8-emm</string>
-    <string>dbapi-2</string>
+<dict>
+   <key>CFBundleURLSchemes</key>
+   <array>
+      <string>sample</string>§
+   </array>
+</dict>
 </array>
 ```
 
-
-2**Add below code to AppDelegate.swift**:
-
-```swift
-        import ObjectiveDropboxOfficial
-
-        // should be inside AppDelegate class
-        override func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
-          if let authResult = DBClientsManager.handleRedirectURL(url) {
-              if authResult.isSuccess() {
-                  print("dropbox auth success")
-              } else if (authResult.isCancel()) {
-                  print("dropbox auth cancel")
-              } else if (authResult.isError()) {
-                  print("dropbox auth error \(authResult.errorDescription)")
-              }
-          }
-          return true
-        }
-
-        // if your are linked with ObjectiveDropboxOfficial 6.x use below code instead
-
-        override func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
-          DBClientsManager.handleRedirectURL(url, completion:{ (authResult) in
-            if let authResult = authResult {
-                if authResult.isSuccess() {
-                    print("dropbox auth success")
-                } else if (authResult.isCancel()) {
-                    print("dropbox auth cancel")
-                } else if (authResult.isError()) {
-                    print("dropbox auth error \(authResult.errorDescription)")
-                }
-            }
-          });
-          return true
-        }
-```
 
 ### OneDrive
 
@@ -157,11 +110,12 @@ Add this to /android/app/src/main/AndroidManifest.xml inside the application blo
     - Click `New registration`.
     - For native apps set Redirect URI to `https://login.microsoftonline.com/common/oauth2/nativeclient` .
     - Obtain your `Client ID`.
-    - On the left side go to Manage -> API permissions
-    - Click add a Permission
-    - Selected "Delegated permission"
-    - Search for the Permissions your app needs like:
-      - Files.Read, Files.ReadWrite, Files.Read.All, Files.ReadWrite.All
+    - Selected Manage -> "API Permissons"
+    - Add the Microsoft Graph Permissions your app needs:
+      - Files.Read
+      - Files.ReadWrite
+      - Files.Read.All
+      - Files.ReadWrite.All
 
 ---
 

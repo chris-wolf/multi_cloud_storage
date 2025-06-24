@@ -31,21 +31,18 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-        </activity>
 
-        <!-- Add Dropbox Auth Activity -->
-        <activity
-            android:name="com.dropbox.core.android.AuthActivity"
-            android:exported="true"
-            android:launchMode="singleTask">
+            <!-- Deep Link sample -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:scheme="db-9ug7o5897zndmq0"  />
+                <!-- Add optional android:host to distinguish your app
+                      from others in case of conflicting scheme name -->
+                <data android:scheme="sample" android:host="auth.my.app" />
             </intent-filter>
         </activity>
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
