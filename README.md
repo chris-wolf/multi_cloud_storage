@@ -18,7 +18,7 @@ A Flutter plugin that provides a unified API for interacting with multiple cloud
 
 | Service       | Android | iOS | Mac  | Windows | Linux |
 | ------------- |:-------:|:---:|:----:|:-------:|:-----:|
-| OneDrive      |    ✅    | ✅  | ⚠️   |   ⚠️    |  ❌   |
+| OneDrive      |    ✅    | ⚠️  | ⚠️   |   ⚠️    |  ❌   |
 | Google Drive  |    ✅    | ✅  | ⚠️   |   ❌    |  ❌   |
 | Dropbox       |    ✅    | ✅  | ⚠️   |   ⚠️    |  ⚠️   |
 
@@ -53,6 +53,29 @@ flutter pub get
    - Go to [Google Cloud Console Credentials](https://console.cloud.google.com/apis/credentials).
    - Create Credentials -> OAuth client ID. ()
    - Select "Android", "iOS", or "Web" based on your needs. (Make sure all data is correct for your app or else it won't work)
+
+#### iOS
+
+- After authorization download the .plist file and rename it to GoogleService-Info.plist
+- Open the ios project in xCode (/ios/Runner.xcworkspace)
+- Drag and drop GoogleService-Info.plist into Runner/Runner/
+- Click on GoogleService-Info.plist and press the two arrows top right to see the code
+- Copy the values of CLIENT_ID and REVERSED_CLIENT_ID into Info.plist inside the dict block, it should look similar to this:
+```xml
+<key>GIDClientID</key>
+<string>777610123509-lnl76p3pfq343v7l7vtur95l239trgku.apps.googleusercontent.com</string>
+<key>CFBundleURLTypes</key>
+<array>
+<dict>
+   <key>CFBundleTypeRole</key>
+   <string>Editor</string>
+   <key>CFBundleURLSchemes</key>
+   <array>
+      <string>com.googleusercontent.apps.777610123509-lnl76p3pfq343v7l7vtur95l239trgku</string>
+   </array>
+</dict>
+</array>
+```
 
 
 ### OneDrive
@@ -89,7 +112,7 @@ flutter pub get
 
 
 #### Android
-#### Add this to /android/app/src/main/AndroidManifest.xml inside you MainActivity bloc
+#### Add this to /android/app/src/main/AndroidManifest.xml inside your MainActivity blocl
 **(Replace `sample` and `auth.my.app` with your redirect URI defined above)**
 
 ```xml
@@ -115,7 +138,7 @@ flutter pub get
 <dict>
    <key>CFBundleURLSchemes</key>
    <array>
-      <string>sample</string>§
+      <string>sample</string>
    </array>
 </dict>
 </array>

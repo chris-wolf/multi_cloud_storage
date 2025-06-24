@@ -57,6 +57,12 @@
                 <string>com.googleusercontent.apps.777610123509-lnl76p3pfq343v7l7vtur95l239trgku</string>
             </array>
         </dict>
+        <dict>
+            <key>CFBundleURLSchemes</key>
+                <array>
+                  <string>sample</string>
+                </array>
+         </dict>
     </array>
 </dict>
 </plist>

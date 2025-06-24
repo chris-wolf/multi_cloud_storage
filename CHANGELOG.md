@@ -1,4 +1,7 @@
 ## 0.5.0
+* Fixes for iOS 
+
+## 0.5.0
 
 * Rewrote dropbox integration to use api instead of dropbox sdk (that caused issues when using dropbox web login)
 * Added logout function
