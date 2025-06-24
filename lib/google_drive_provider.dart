@@ -1,12 +1,13 @@
 import 'dart:io';
+
 import 'package:extension_google_sign_in_as_googleapis_auth/extension_google_sign_in_as_googleapis_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
-import 'package:path/path.dart';
-import 'cloud_storage_provider.dart';
 import 'package:http/http.dart' as http;
+import 'package:path/path.dart';
 
+import 'cloud_storage_provider.dart';
 import 'multi_cloud_storage.dart';
 
 class GoogleDriveProvider extends CloudStorageProvider {

@@ -1,9 +1,8 @@
 import 'package:flutter/cupertino.dart';
+import 'package:multi_cloud_storage/cloud_storage_provider.dart';
 import 'package:multi_cloud_storage/google_drive_provider.dart';
 import 'package:multi_cloud_storage/onedrive_provider.dart';
-import 'package:multi_cloud_storage/cloud_storage_provider.dart';
 
-import 'cloud_storage_provider.dart';
 import 'dropbox_provider.dart';
 
 class MultiCloudStorage {
