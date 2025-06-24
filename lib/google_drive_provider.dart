@@ -6,7 +6,6 @@ import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:path/path.dart';
 import 'cloud_storage_provider.dart';
 import 'package:http/http.dart' as http;
-import 'package:googleapis_auth/googleapis_auth.dart';
 
 import 'multi_cloud_storage.dart';
 
@@ -26,7 +25,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
   static GoogleDriveProvider? get instance => _instance;
 
   @override
-   Future<String?> loggedInUserDisplayName() async {
+  Future<String?> loggedInUserDisplayName() async {
     return _googleSignIn?.currentUser?.displayName;
   }
 
@@ -44,7 +43,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
       scopes: [
         MultiCloudStorage.cloudAccess == CloudAccessType.appStorage
             ? drive.DriveApi
-                .driveAppdataScope // Use driveAppdataScope for appDataFolder
+            .driveAppdataScope // Use driveAppdataScope for appDataFolder
             : drive.DriveApi.driveScope, // Full drive access
         // You might need PeopleServiceApi.contactsReadonlyScope or other scopes
         // if GSI complains about missing them, but for Drive, these should be enough.
@@ -56,7 +55,9 @@ class GoogleDriveProvider extends CloudStorageProvider {
     );
 
     GoogleSignInAccount? account;
-    AuthClient? client;
+    // The `authenticatedClient` extension method from `extension_google_sign_in_as_googleapis_auth`
+    // returns a `http.Client`.
+    http.Client? client;
 
     try {
       if (!forceInteractive) {
@@ -71,13 +72,14 @@ class GoogleDriveProvider extends CloudStorageProvider {
         if (account == null) {
           debugPrint("GoogleDriveProvider: Interactive sign-in cancelled by user.");
           _instance?._isAuthenticated =
-              false; // Ensure state is false if it was previously true
+          false; // Ensure state is false if it was previously true
           return null; // User cancelled
         }
       }
       debugPrint("GoogleDriveProvider: Sign-in successful for ${account.email}.");
 
-      // Get the AuthClient from the extension
+      // Get the authenticated client from the extension.
+      // This client will handle refreshing the access token automatically.
       client = await _googleSignIn!.authenticatedClient();
 
       if (client == null) {
@@ -90,6 +92,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
 
       debugPrint("GoogleDriveProvider: Authenticated client obtained.");
       final provider = _instance ?? GoogleDriveProvider._create();
+      // The drive.DriveApi constructor accepts the http.Client provided by the extension.
       provider.driveApi = drive.DriveApi(client);
       provider._isAuthenticated = true;
       _instance = provider;
@@ -160,15 +163,12 @@ class GoogleDriveProvider extends CloudStorageProvider {
           .create(driveFile, uploadMedia: media, $fields: 'id');
     } catch (e) {
       debugPrint("Error uploading file: $e");
-      // Check for auth-related errors here if needed, though the client should refresh
+      // The authenticated client should handle token refreshes.
+      // If an error still occurs, it might be a permissions issue.
       if (e is drive.DetailedApiRequestError &&
           (e.status == 401 || e.status == 403)) {
-        debugPrint("Authentication error during upload. Attempting to reconnect...");
+        debugPrint("Authentication error during upload. The user may not have permission, or the token is invalid.");
         _isAuthenticated = false; // Mark as unauthenticated
-        // Optionally try to reconnect or notify user
-        // await connect(forceInteractive: true);
-        // _checkAuth(); // Re-check auth
-        // Retry logic could be added here
       }
       rethrow;
     }
@@ -198,10 +198,10 @@ class GoogleDriveProvider extends CloudStorageProvider {
         $fields: 'id',
       );
     } catch (e) {
-      debugPrint("Error uploading file: $e");
+      debugPrint("Error uploading file by ID: $e");
       if (e is drive.DetailedApiRequestError &&
           (e.status == 401 || e.status == 403)) {
-        debugPrint("Authentication error during upload. Attempting to reconnect...");
+        debugPrint("Authentication error during upload. The user may not have permission, or the token is invalid.");
         _isAuthenticated = false;
       }
       rethrow;
@@ -242,8 +242,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
       debugPrint("Error downloading file: $e");
       if (e is drive.DetailedApiRequestError &&
           (e.status == 401 || e.status == 403)) {
-        debugPrint(
-            "Authentication error during download. Attempting to reconnect...");
+        debugPrint("Authentication error during download. The user may not have permission, or the token is invalid.");
         _isAuthenticated = false;
       }
       rethrow;
@@ -256,7 +255,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
   Future<List<CloudFile>> listFiles({
     required String path,
     bool recursive =
-        false, // Recursive listing can be complex and quota-intensive
+    false, // Recursive listing can be complex and quota-intensive
   }) async {
     _checkAuth();
 
@@ -275,21 +274,14 @@ class GoogleDriveProvider extends CloudStorageProvider {
             : 'drive',
         q: "'${folder.id}' in parents and trashed = false",
         $fields:
-            'nextPageToken, files(id, name, size, modifiedTime, mimeType, parents)',
+        'nextPageToken, files(id, name, size, modifiedTime, mimeType, parents)',
         pageToken: pageToken,
-        // Consider spaces: 'appDataFolder' for app-specific data, 'drive' for full access
-        // spaces: MultiCloudStorage.cloudAccess == CloudAccessType.appStorage ? 'appDataFolder' : 'drive',
       );
 
       if (fileList.files != null) {
         for (final file in fileList.files!) {
-          // Construct full path. For items directly in the listed 'path', it's join(path, file.name).
-          // If the item is in a subfolder of listed 'path' (due to recursive or complex query),
-          // its path needs to be correctly determined.
-          // For non-recursive, it's simpler:
           String currentItemPath = join(path, file.name ?? '');
           if (path == '/' || path.isEmpty) {
-            // Handling root path
             currentItemPath = file.name ?? '';
           }
 
@@ -312,7 +304,6 @@ class GoogleDriveProvider extends CloudStorageProvider {
       pageToken = fileList.nextPageToken;
     } while (pageToken != null);
 
-    // Basic recursive implementation (can be very slow and hit API limits for large drives)
     if (recursive) {
       final List<CloudFile> subFolderFiles = [];
       for (final cf in cloudFiles) {
@@ -366,8 +357,6 @@ class GoogleDriveProvider extends CloudStorageProvider {
       }
     } else {
       debugPrint("GoogleDriveProvider: File/Folder to delete not found at $path");
-      // Optionally throw an exception if not found behavior is critical
-      // throw Exception('File not found for deletion: $path');
     }
   }
 
@@ -386,10 +375,8 @@ class GoogleDriveProvider extends CloudStorageProvider {
       throw Exception('GoogleDriveProvider: File not found at $path');
     }
 
-    // Path for CloudFile should be the original input path.
-    // If path normalization occurs (e.g. resolving to root), ensure original path is used.
     return CloudFile(
-      path: path, // Use the input path for consistency
+      path: path,
       name: file.name ?? 'Unnamed',
       size: file.size == null ? null : int.tryParse(file.size!),
       modifiedTime: file.modifiedTime ?? DateTime.now(),
@@ -405,21 +392,16 @@ class GoogleDriveProvider extends CloudStorageProvider {
   Future<drive.File?> _getFileByPath(String filePath) async {
     _checkAuth();
     if (filePath.isEmpty || filePath == '.' || filePath == '/') {
-      // Cannot get a "file" that is the root itself this way,
-      // root has special handling or use _getFolderByPath for root folder metadata.
-      // This method expects a file or folder *within* another folder.
       if (filePath == '/' || filePath == '.') {
-        // Requesting root metadata
         return _getRootFolder();
       }
       return null;
     }
 
-    // Normalize path: remove leading/trailing slashes for consistent splitting
     final normalizedPath =
-        filePath.replaceAll(RegExp(r'^/+'), '').replaceAll(RegExp(r'/+$'), '');
+    filePath.replaceAll(RegExp(r'^/+'), '').replaceAll(RegExp(r'/+$'), '');
     if (normalizedPath.isEmpty) {
-      return _getRootFolder(); // If path was only slashes
+      return _getRootFolder();
     }
 
     final parts = split(normalizedPath);
@@ -427,7 +409,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
 
     for (var i = 0; i < parts.length - 1; i++) {
       final folderName = parts[i];
-      if (folderName.isEmpty) continue; // Should not happen with normalizedPath
+      if (folderName.isEmpty) continue;
       final folder = await _getFolderByName(currentFolder.id!, folderName);
       if (folder == null) {
         debugPrint(
@@ -439,8 +421,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
 
     final fileName = parts.last;
     if (fileName.isEmpty) {
-      // Path ended with a slash, meaning it's a directory request
-      return currentFolder; // This is the directory itself
+      return currentFolder;
     }
 
     final query =
@@ -451,7 +432,6 @@ class GoogleDriveProvider extends CloudStorageProvider {
           : 'drive',
       q: query,
       $fields: 'files(id, name, size, modifiedTime, mimeType, parents)',
-      // spaces: MultiCloudStorage.cloudAccess == CloudAccessType.appStorage ? 'appDataFolder' : 'drive',
     );
 
     return fileList.files?.isNotEmpty == true ? fileList.files!.first : null;
@@ -463,7 +443,6 @@ class GoogleDriveProvider extends CloudStorageProvider {
       return _getRootFolder();
     }
 
-    // Remove leading/trailing slashes for consistent splitting
     final normalizedPath = folderPath
         .replaceAll(RegExp(r'^/+'), '')
         .replaceAll(RegExp(r'/+$'), '');
@@ -473,7 +452,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
     drive.File currentFolder = await _getRootFolder();
 
     for (final part in parts) {
-      if (part.isEmpty) continue; // Should not happen with normalizedPath
+      if (part.isEmpty) continue;
 
       var folder = await _getFolderByName(currentFolder.id!, part);
       folder ??= await _createFolder(currentFolder.id!, part);
@@ -483,17 +462,8 @@ class GoogleDriveProvider extends CloudStorageProvider {
   }
 
   Future<drive.File> _getRootFolder() async {
-    // In Drive API, the root folder ID is 'root' or 'appDataFolder'
+    _checkAuth();
     String rootFolderId = await _getRootFolderId();
-    // We generally don't fetch 'root' or 'appDataFolder' details, just use its ID.
-    // If you need its metadata, you'd call files.get(rootFolderId).
-
-    if (_instance == null || !_instance!._isAuthenticated) _checkAuth();
-
-    // To get metadata of the root folder if actually needed:
-    // return await driveApi.files.get(rootFolderId, $fields: 'id, name, mimeType, parents');
-
-    // For path traversal, just its ID is sufficient:
     return drive.File()..id = rootFolderId;
   }
 
@@ -507,8 +477,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
           : 'drive',
       q: query,
       $fields:
-          'files(id, name, mimeType, parents)', // Add mimeType and parents for consistency
-      // spaces: MultiCloudStorage.cloudAccess == CloudAccessType.appStorage ? 'appDataFolder' : 'drive',
+      'files(id, name, mimeType, parents)',
     );
     return fileList.files?.isNotEmpty == true ? fileList.files!.first : null;
   }
@@ -524,14 +493,10 @@ class GoogleDriveProvider extends CloudStorageProvider {
         .create(folder, $fields: 'id, name, mimeType, parents');
   }
 
-  // Helper to sanitize strings for Drive API queries (names with single quotes)
   String _sanitizeQueryString(String value) {
     return value.replaceAll("'", "\\'");
   }
 
-  /// Add this function to the GoogleDriveProvider class
-  /// It creates a shareable link for a given file or folder path,
-  /// and optionally returns metadata so the recipient can recreate the original folder structure.
   @override
   Future<Uri?> generateSharableLink(String path) async {
     _checkAuth();
@@ -542,7 +507,6 @@ class GoogleDriveProvider extends CloudStorageProvider {
       return null;
     }
 
-    // Set permission to anyone with the link can edit
     final permission = drive.Permission()
       ..type = 'anyone'
       ..role = 'writer';
@@ -558,7 +522,6 @@ class GoogleDriveProvider extends CloudStorageProvider {
       return null;
     }
 
-    // Generate shareable link
     try {
       final fileMetadata = await driveApi.files.get(
         file.id!,
@@ -570,7 +533,6 @@ class GoogleDriveProvider extends CloudStorageProvider {
         return null;
       }
 
-      // Optionally encode original path info as query parameters for your app
       final shareableUri = Uri.parse(fileMetadata.webViewLink!).replace(
         queryParameters: {
           ...Uri.parse(fileMetadata.webViewLink!).queryParameters,
@@ -589,7 +551,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
   Future<bool> logout() async {
     if (_isAuthenticated) {
       try {
-        await signOut(); // Includes disconnect, signOut, and resets state
+        await signOut();
         _isAuthenticated = false;
         return true;
       } catch (e) {
@@ -605,30 +567,26 @@ class GoogleDriveProvider extends CloudStorageProvider {
     if (!_isAuthenticated || _instance == null) return true;
 
     try {
-      // Try a simple API call to check if token is valid
-      await driveApi.files.list(
-        spaces: MultiCloudStorage.cloudAccess == CloudAccessType.appStorage
-            ? 'appDataFolder'
-            : 'drive',
-        pageSize: 1,
-      );
-      return false;
+      // The authenticated client handles token refreshes automatically, but we can make a
+      // lightweight call to check for connectivity and fundamental auth issues.
+      await driveApi.about.get($fields: 'user');
+      return false; // If the call succeeds, the token is considered valid.
     } on drive.DetailedApiRequestError catch (e) {
       if (e.status == 401 || e.status == 403) {
-        // Token is invalid or expired
+        _isAuthenticated = false; // Token is invalid or expired
         return true;
       }
       return false; // Some other API error
     } on http.ClientException catch (_) {
-      // Likely a network issue, not an auth issue
+      // Likely a network issue, not an auth issue.
       return false;
     } catch (_) {
-      // Unknown error, assume token is still valid to be safe
+      // Unknown error, could be anything.
       return false;
     }
   }
 
-   @override
+  @override
   Future<String> getSharedFileById({
     required String fileId,
     required String localPath,
@@ -642,20 +600,19 @@ class GoogleDriveProvider extends CloudStorageProvider {
       final media = await driveApi.files.get(
         fileId,
         downloadOptions: drive.DownloadOptions.fullMedia,
-      ) as drive.Media; // Cast is important here
+      ) as drive.Media;
 
       await media.stream.pipe(sink);
       await sink.close();
     } catch (e) {
-      await sink.close(); // Ensure sink is closed on error
-      // Delete partially downloaded file if an error occurs
+      await sink.close();
       if (await output.exists()) {
         await output.delete();
       }
       debugPrint("Error downloading shared file by ID: $e");
       if (e is drive.DetailedApiRequestError &&
           (e.status == 401 || e.status == 403)) {
-        debugPrint("Authentication error during download. Attempting to reconnect...");
+        debugPrint("Authentication error during download.");
         _isAuthenticated = false;
       }
       rethrow;
@@ -669,6 +626,6 @@ class GoogleDriveProvider extends CloudStorageProvider {
   Future<String?> extractFileIdFromSharableLink(Uri shareLink) async {
     final regex = RegExp(r'd/([a-zA-Z0-9_-]+)');
     final match = regex.firstMatch(shareLink.toString());
-    return match != null ? match.group(1)! : '';
+    return match?.group(1);
   }
 }
