@@ -51,11 +51,11 @@ class DropboxToken {
   }
 
   Map<String, dynamic> toJson() => {
-    'access_token': accessToken,
-    'refresh_token': refreshToken,
-    'token_type': tokenType,
-    'expires_in': expiresIn.toIso8601String(),
-  };
+        'access_token': accessToken,
+        'refresh_token': refreshToken,
+        'token_type': tokenType,
+        'expires_in': expiresIn.toIso8601String(),
+      };
 
   bool get isExpired =>
       DateTime.now().isAfter(expiresIn.subtract(const Duration(minutes: 5)));
@@ -78,7 +78,7 @@ class DropboxAccount {
       accountId: json['account_id'] as String,
       email: json['email'] as String,
       displayName:
-      (json['name'] as Map<String, dynamic>)['display_name'] as String,
+          (json['name'] as Map<String, dynamic>)['display_name'] as String,
     );
   }
 }
@@ -144,7 +144,8 @@ class DropboxProvider extends CloudStorageProvider {
           debugPrint(
               "DropboxProvider: Stored token is expired, attempting refresh...");
           await provider._refreshToken();
-          await provider._saveToken(provider._token); // Save the refreshed token
+          await provider
+              ._saveToken(provider._token); // Save the refreshed token
         }
         await provider._fetchCurrentUserAccount();
         provider._isAuthenticated = true;
@@ -406,8 +407,8 @@ class DropboxProvider extends CloudStorageProvider {
   @override
   Future<String> uploadFile(
       {required String localPath,
-        required String remotePath,
-        Map<String, dynamic>? metadata}) async {
+      required String remotePath,
+      Map<String, dynamic>? metadata}) async {
     _checkAuth();
     final file = File(localPath);
     final fileStream = file.openRead();
@@ -476,7 +477,9 @@ class DropboxProvider extends CloudStorageProvider {
       );
     } on DioException catch (e) {
       // Ignore error if the folder already exists.
-      if (e.response?.data?['error_summary']?.contains('path/conflict/folder') == false) {
+      if (e.response?.data?['error_summary']
+              ?.contains('path/conflict/folder') ==
+          false) {
         rethrow;
       }
       debugPrint("Directory already exists, ignoring error.");
@@ -541,7 +544,8 @@ class DropboxProvider extends CloudStorageProvider {
       name: data['name'],
       size: isDir ? null : data['size'],
       modifiedTime: isDir
-          ? DateTime.now() // Folders don't have a specific modified time in list_folder
+          ? DateTime
+              .now() // Folders don't have a specific modified time in list_folder
           : DateTime.parse(data['server_modified']),
       isDirectory: isDir,
       metadata: {'id': data['id'], if (!isDir) 'rev': data['rev']},
@@ -590,7 +594,9 @@ class DropboxProvider extends CloudStorageProvider {
         options: Options(contentType: 'application/json'),
       );
     } on DioException catch (e) {
-      if (e.response?.data?['error_summary']?.contains('bad_path/already_shared') == false) {
+      if (e.response?.data?['error_summary']
+              ?.contains('bad_path/already_shared') ==
+          false) {
         rethrow;
       }
       debugPrint("Folder is already shared, proceeding...");
@@ -611,7 +617,10 @@ class DropboxProvider extends CloudStorageProvider {
       return Uri.parse(response.data['url']);
     } on DioException catch (e) {
       final errorData = e.response?.data;
-      if (errorData is Map && errorData['error_summary'].toString().contains('shared_link_already_exists')) {
+      if (errorData is Map &&
+          errorData['error_summary']
+              .toString()
+              .contains('shared_link_already_exists')) {
         final listResponse = await _dio.post(
           'https://api.dropboxapi.com/2/sharing/list_shared_links',
           data: jsonEncode({'path': normalizedPath, 'direct_only': true}),
@@ -628,7 +637,8 @@ class DropboxProvider extends CloudStorageProvider {
 
   @override
   Future<String?> extractFileIdFromSharableLink(Uri shareLink) async {
-    if (shareLink.host.contains('dropbox.com') && shareLink.path.contains('/scl/fo/')) {
+    if (shareLink.host.contains('dropbox.com') &&
+        shareLink.path.contains('/scl/fo/')) {
       return shareLink.toString();
     }
     debugPrint("Link is not a valid Dropbox shared folder link: $shareLink");
@@ -636,18 +646,23 @@ class DropboxProvider extends CloudStorageProvider {
   }
 
   @override
-  Future<String> uploadFileById({required String localPath, required String fileId, Map<String, dynamic>? metadata}) async {
+  Future<String> uploadFileById(
+      {required String localPath,
+      required String fileId,
+      Map<String, dynamic>? metadata}) async {
     _checkAuth();
 
     var folderInfo = await _findOrJoinSharedFolder(fileId);
     final remoteFilePath = "${folderInfo['path_lower']}/sync_file.json";
 
     debugPrint("Uploading to resolved remote path: $remoteFilePath");
-    return uploadFile(localPath: localPath, remotePath: remoteFilePath, metadata: metadata);
+    return uploadFile(
+        localPath: localPath, remotePath: remoteFilePath, metadata: metadata);
   }
 
   @override
-  Future<String> getSharedFileById({required String fileId, required String localPath}) async {
+  Future<String> getSharedFileById(
+      {required String fileId, required String localPath}) async {
     _checkAuth();
 
     var folderInfo = await _findOrJoinSharedFolder(fileId);
@@ -658,22 +673,26 @@ class DropboxProvider extends CloudStorageProvider {
   }
 
   /// Centralized helper to find a mounted folder or join it if not found.
-  Future<Map<String, String>> _findOrJoinSharedFolder(String sharedLinkUrl) async {
+  Future<Map<String, String>> _findOrJoinSharedFolder(
+      String sharedLinkUrl) async {
     var folderInfo = await _findMountedFolderInfo(sharedLinkUrl);
 
     if (folderInfo == null) {
-      debugPrint("Shared folder not found in user's Dropbox. Attempting to join...");
+      debugPrint(
+          "Shared folder not found in user's Dropbox. Attempting to join...");
       try {
         folderInfo = await joinSharedFolder(sharedLinkUrl: sharedLinkUrl);
       } catch (e) {
         debugPrint("Failed to automatically join shared folder: $e");
-        throw Exception("Shared folder could not be found or joined. Please ensure the link is valid and you have permission.");
+        throw Exception(
+            "Shared folder could not be found or joined. Please ensure the link is valid and you have permission.");
       }
     }
     return folderInfo;
   }
 
-  Future<Map<String, String>?> _findMountedFolderInfo(String sharedLinkUrl) async {
+  Future<Map<String, String>?> _findMountedFolderInfo(
+      String sharedLinkUrl) async {
     _checkAuth();
 
     String targetSharedFolderId;
@@ -683,7 +702,8 @@ class DropboxProvider extends CloudStorageProvider {
         data: jsonEncode({'url': sharedLinkUrl}),
         options: Options(contentType: 'application/json'),
       );
-      targetSharedFolderId = metaResponse.data['id'].toString().replaceFirst('id:', '');
+      targetSharedFolderId =
+          metaResponse.data['id'].toString().replaceFirst('id:', '');
     } catch (e) {
       debugPrint("Could not get metadata from shared link: $e");
       return null;
@@ -694,18 +714,24 @@ class DropboxProvider extends CloudStorageProvider {
     while (hasMore) {
       Response response = cursor == null
           ? await _dio.post(
-        'https://api.dropboxapi.com/2/files/list_folder',
-        data: jsonEncode({'path': '', 'recursive': true, 'include_shared_folders': true}),
-        options: Options(contentType: 'application/json'),
-      )
+              'https://api.dropboxapi.com/2/files/list_folder',
+              data: jsonEncode({
+                'path': '',
+                'recursive': true,
+                'include_shared_folders': true
+              }),
+              options: Options(contentType: 'application/json'),
+            )
           : await _dio.post(
-        'https://api.dropboxapi.com/2/files/list_folder/continue',
-        data: jsonEncode({'cursor': cursor}),
-        options: Options(contentType: 'application/json'),
-      );
+              'https://api.dropboxapi.com/2/files/list_folder/continue',
+              data: jsonEncode({'cursor': cursor}),
+              options: Options(contentType: 'application/json'),
+            );
 
       for (final entry in (response.data['entries'] as List)) {
-        if (entry['.tag'] == 'folder' && entry['sharing_info']?['shared_folder_id'] == targetSharedFolderId) {
+        if (entry['.tag'] == 'folder' &&
+            entry['sharing_info']?['shared_folder_id'] ==
+                targetSharedFolderId) {
           return {'path_lower': entry['path_lower'], 'name': entry['name']};
         }
       }
@@ -715,7 +741,8 @@ class DropboxProvider extends CloudStorageProvider {
     return null;
   }
 
-  Future<Map<String, String>> joinSharedFolder({required String sharedLinkUrl}) async {
+  Future<Map<String, String>> joinSharedFolder(
+      {required String sharedLinkUrl}) async {
     _checkAuth();
 
     String targetSharedFolderId;
@@ -725,10 +752,12 @@ class DropboxProvider extends CloudStorageProvider {
         data: jsonEncode({'url': sharedLinkUrl}),
         options: Options(contentType: 'application/json'),
       );
-      targetSharedFolderId = metaResponse.data['id'].toString().replaceFirst('id:', '');
+      targetSharedFolderId =
+          metaResponse.data['id'].toString().replaceFirst('id:', '');
     } catch (e) {
       debugPrint("Could not get metadata from shared link: $e");
-      throw Exception("Invalid shared link or insufficient permissions to view it.");
+      throw Exception(
+          "Invalid shared link or insufficient permissions to view it.");
     }
 
     try {
@@ -740,19 +769,24 @@ class DropboxProvider extends CloudStorageProvider {
       );
 
       debugPrint("Successfully mounted folder: ${mountResponse.data['name']}");
-      return {'path_lower': mountResponse.data['path_lower'], 'name': mountResponse.data['name']};
+      return {
+        'path_lower': mountResponse.data['path_lower'],
+        'name': mountResponse.data['name']
+      };
     } on DioException catch (e) {
       final error = e.response?.data?['error'];
       if (error != null && error['.tag'] == 'already_mounted') {
         debugPrint("Folder is already mounted. Locating it...");
         final folderInfo = await _findMountedFolderInfo(sharedLinkUrl);
         if (folderInfo == null) {
-          throw Exception("Could not locate the folder in Dropbox, even though it is reportedly mounted.");
+          throw Exception(
+              "Could not locate the folder in Dropbox, even though it is reportedly mounted.");
         }
         return folderInfo;
       }
       debugPrint("Error mounting folder: $e");
-      throw Exception("Could not mount the shared folder. The user may not have permission or another API error occurred.");
+      throw Exception(
+          "Could not mount the shared folder. The user may not have permission or another API error occurred.");
     }
   }
 }

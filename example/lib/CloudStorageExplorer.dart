@@ -10,7 +10,8 @@ import 'package:permission_handler/permission_handler.dart';
 class CloudStorageExplorerPage extends StatefulWidget {
   final CloudStorageProvider cloudStorageProvider;
 
-  const CloudStorageExplorerPage({super.key, required this.cloudStorageProvider});
+  const CloudStorageExplorerPage(
+      {super.key, required this.cloudStorageProvider});
 
   @override
   _CloudStorageExplorerPageState createState() =>
@@ -94,7 +95,6 @@ class _CloudStorageExplorerPageState extends State<CloudStorageExplorerPage> {
       _showError('Delete failed: $e');
     }
   }
-
 
   Future<void> _logout() async {
     await widget.cloudStorageProvider.logout();

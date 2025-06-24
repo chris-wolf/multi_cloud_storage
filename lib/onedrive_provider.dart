@@ -32,7 +32,8 @@ class OneDriveProvider extends CloudStorageProvider {
           'App registration required: https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade');
     }
     if (redirectUri.isEmpty) {
-      redirectUri = 'https://login.microsoftonline.com/common/oauth2/nativeclient'; //fallback: use native redirect
+      redirectUri =
+          'https://login.microsoftonline.com/common/oauth2/nativeclient'; //fallback: use native redirect
     }
     final provider = OneDriveProvider._create(
         clientId: clientId, redirectUri: redirectUri, context: context);
@@ -144,13 +145,14 @@ class OneDriveProvider extends CloudStorageProvider {
       clientID: client.clientID,
       redirectURL: client.redirectURL,
       scope: client.scopes,
-    ).getAccessToken(); 
+    ).getAccessToken();
     if (accessToken == null || accessToken.isEmpty) {
       debugPrint("OneDriveProvider: No access token available.");
       return null;
     }
 
-    final encodedPath = Uri.encodeComponent(path.startsWith('/') ? path.substring(1) : path);
+    final encodedPath =
+        Uri.encodeComponent(path.startsWith('/') ? path.substring(1) : path);
     final driveItemPath = "/me/drive/root:/$encodedPath:/createLink";
 
     try {
@@ -167,7 +169,8 @@ class OneDriveProvider extends CloudStorageProvider {
       );
 
       if (response.statusCode != 200) {
-        debugPrint("OneDriveProvider: Failed to create shareable link: ${response.body}");
+        debugPrint(
+            "OneDriveProvider: Failed to create shareable link: ${response.body}");
         return null;
       }
 
@@ -211,7 +214,7 @@ class OneDriveProvider extends CloudStorageProvider {
       await client.listFiles('/');
       return false;
     } catch (e) {
-      return e.toString().contains('401') ||  e.toString().contains('403');
+      return e.toString().contains('401') || e.toString().contains('403');
     }
   }
 
@@ -236,7 +239,8 @@ class OneDriveProvider extends CloudStorageProvider {
     }
 
     final response = await http.get(
-      Uri.parse('https://graph.microsoft.com/v1.0/me/drive/items/$fileId/content'),
+      Uri.parse(
+          'https://graph.microsoft.com/v1.0/me/drive/items/$fileId/content'),
       headers: {
         'Authorization': 'Bearer $accessToken',
       },
@@ -276,7 +280,8 @@ class OneDriveProvider extends CloudStorageProvider {
     final fileBytes = await File(localPath).readAsBytes();
 
     final response = await http.put(
-      Uri.parse('https://graph.microsoft.com/v1.0/me/drive/items/$fileId/content'),
+      Uri.parse(
+          'https://graph.microsoft.com/v1.0/me/drive/items/$fileId/content'),
       headers: {
         'Authorization': 'Bearer $accessToken',
         'Content-Type': 'application/octet-stream',
@@ -313,7 +318,8 @@ class OneDriveProvider extends CloudStorageProvider {
       final json = jsonDecode(response.body);
       return json['id']; // actual OneDrive item ID
     } else {
-      throw Exception('Failed to resolve item ID: ${response.statusCode}, ${response.body}');
+      throw Exception(
+          'Failed to resolve item ID: ${response.statusCode}, ${response.body}');
     }
   }
 

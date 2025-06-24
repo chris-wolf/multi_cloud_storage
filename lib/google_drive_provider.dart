@@ -44,7 +44,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
       scopes: [
         MultiCloudStorage.cloudAccess == CloudAccessType.appStorage
             ? drive.DriveApi
-            .driveAppdataScope // Use driveAppdataScope for appDataFolder
+                .driveAppdataScope // Use driveAppdataScope for appDataFolder
             : drive.DriveApi.driveScope, // Full drive access
         // You might need PeopleServiceApi.contactsReadonlyScope or other scopes
         // if GSI complains about missing them, but for Drive, these should be enough.
@@ -71,13 +71,15 @@ class GoogleDriveProvider extends CloudStorageProvider {
             "GoogleDriveProvider: Silent sign-in failed or interactive forced. Attempting interactive sign-in...");
         account = await _googleSignIn!.signIn();
         if (account == null) {
-          debugPrint("GoogleDriveProvider: Interactive sign-in cancelled by user.");
+          debugPrint(
+              "GoogleDriveProvider: Interactive sign-in cancelled by user.");
           _instance?._isAuthenticated =
-          false; // Ensure state is false if it was previously true
+              false; // Ensure state is false if it was previously true
           return null; // User cancelled
         }
       }
-      debugPrint("GoogleDriveProvider: Sign-in successful for ${account.email}.");
+      debugPrint(
+          "GoogleDriveProvider: Sign-in successful for ${account.email}.");
 
       // Get the authenticated client from the extension.
       // This client will handle refreshing the access token automatically.
@@ -113,14 +115,14 @@ class GoogleDriveProvider extends CloudStorageProvider {
   static Future<void> signOut() async {
     try {
       await _googleSignIn?.disconnect(); // Revoke token
-      await _googleSignIn?.signOut();    // Sign out locally
+      await _googleSignIn?.signOut(); // Sign out locally
     } catch (e) {
       debugPrint("GoogleDriveProvider: Sign out error - $e");
     }
 
-    _googleSignIn = null;  // Clear scopes & cached state
+    _googleSignIn = null; // Clear scopes & cached state
     _instance?._isAuthenticated = false;
-    _instance = null;      // Reset the singleton
+    _instance = null; // Reset the singleton
     debugPrint("GoogleDriveProvider: User signed out and GoogleSignIn reset.");
   }
 
@@ -168,7 +170,8 @@ class GoogleDriveProvider extends CloudStorageProvider {
       // If an error still occurs, it might be a permissions issue.
       if (e is drive.DetailedApiRequestError &&
           (e.status == 401 || e.status == 403)) {
-        debugPrint("Authentication error during upload. The user may not have permission, or the token is invalid.");
+        debugPrint(
+            "Authentication error during upload. The user may not have permission, or the token is invalid.");
         _isAuthenticated = false; // Mark as unauthenticated
       }
       rethrow;
@@ -187,7 +190,8 @@ class GoogleDriveProvider extends CloudStorageProvider {
 
     final file = File(localPath);
 
-    final driveFile = drive.File(); // Metadata changes can be added here if needed
+    final driveFile =
+        drive.File(); // Metadata changes can be added here if needed
 
     final media = drive.Media(file.openRead(), await file.length());
     drive.File updatedFile;
@@ -202,7 +206,8 @@ class GoogleDriveProvider extends CloudStorageProvider {
       debugPrint("Error uploading file by ID: $e");
       if (e is drive.DetailedApiRequestError &&
           (e.status == 401 || e.status == 403)) {
-        debugPrint("Authentication error during upload. The user may not have permission, or the token is invalid.");
+        debugPrint(
+            "Authentication error during upload. The user may not have permission, or the token is invalid.");
         _isAuthenticated = false;
       }
       rethrow;
@@ -243,7 +248,8 @@ class GoogleDriveProvider extends CloudStorageProvider {
       debugPrint("Error downloading file: $e");
       if (e is drive.DetailedApiRequestError &&
           (e.status == 401 || e.status == 403)) {
-        debugPrint("Authentication error during download. The user may not have permission, or the token is invalid.");
+        debugPrint(
+            "Authentication error during download. The user may not have permission, or the token is invalid.");
         _isAuthenticated = false;
       }
       rethrow;
@@ -256,7 +262,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
   Future<List<CloudFile>> listFiles({
     required String path,
     bool recursive =
-    false, // Recursive listing can be complex and quota-intensive
+        false, // Recursive listing can be complex and quota-intensive
   }) async {
     _checkAuth();
 
@@ -275,7 +281,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
             : 'drive',
         q: "'${folder.id}' in parents and trashed = false",
         $fields:
-        'nextPageToken, files(id, name, size, modifiedTime, mimeType, parents)',
+            'nextPageToken, files(id, name, size, modifiedTime, mimeType, parents)',
         pageToken: pageToken,
       );
 
@@ -357,7 +363,8 @@ class GoogleDriveProvider extends CloudStorageProvider {
         rethrow;
       }
     } else {
-      debugPrint("GoogleDriveProvider: File/Folder to delete not found at $path");
+      debugPrint(
+          "GoogleDriveProvider: File/Folder to delete not found at $path");
     }
   }
 
@@ -400,7 +407,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
     }
 
     final normalizedPath =
-    filePath.replaceAll(RegExp(r'^/+'), '').replaceAll(RegExp(r'/+$'), '');
+        filePath.replaceAll(RegExp(r'^/+'), '').replaceAll(RegExp(r'/+$'), '');
     if (normalizedPath.isEmpty) {
       return _getRootFolder();
     }
@@ -477,8 +484,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
           ? 'appDataFolder'
           : 'drive',
       q: query,
-      $fields:
-      'files(id, name, mimeType, parents)',
+      $fields: 'files(id, name, mimeType, parents)',
     );
     return fileList.files?.isNotEmpty == true ? fileList.files!.first : null;
   }
@@ -621,7 +627,6 @@ class GoogleDriveProvider extends CloudStorageProvider {
 
     return localPath;
   }
-
 
   @override
   Future<String?> extractFileIdFromSharableLink(Uri shareLink) async {

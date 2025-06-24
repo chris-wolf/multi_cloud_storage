@@ -11,13 +11,12 @@ class MultiCloudStorage {
   static Future<CloudStorageProvider?> connectToDropbox(
           {required String appKey,
           required String appSecret,
-            required String redirectUri}) =>
+          required String redirectUri}) =>
       DropboxProvider.connect(
-          appKey: appKey,
-          appSecret: appSecret,
-          redirectUri: redirectUri);
+          appKey: appKey, appSecret: appSecret, redirectUri: redirectUri);
 
-  static Future<CloudStorageProvider?> connectToGoogleDrive({bool forceInteractive = false}) =>
+  static Future<CloudStorageProvider?> connectToGoogleDrive(
+          {bool forceInteractive = false}) =>
       GoogleDriveProvider.connect(forceInteractive: forceInteractive);
 
   static Future<CloudStorageProvider?> connectToOneDrive({
