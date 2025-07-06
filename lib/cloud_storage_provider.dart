@@ -13,6 +13,7 @@ abstract class CloudStorageProvider {
   Future<String> uploadFileById({
     required String localPath,
     required String fileId,
+    String? subPath,
     Map<String, dynamic>? metadata,
   });
 
@@ -50,6 +51,7 @@ abstract class CloudStorageProvider {
   Future<String> getSharedFileById({
     required String fileId,
     required String localPath,
+    String? subPath
   });
 }
 

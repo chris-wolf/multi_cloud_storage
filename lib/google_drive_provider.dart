@@ -30,83 +30,89 @@ class GoogleDriveProvider extends CloudStorageProvider {
     return _googleSignIn?.currentUser?.displayName;
   }
 
-  // Get an authenticated instance of GoogleDriveProvider
-  // Tries silent sign-in first, then interactive if needed.
+  /// Establishes a connection to Google Drive.
+  ///
+  /// This method handles the entire authentication flow. It first attempts a silent
+  /// sign-in. If that fails or if `forceInteractive` is true, it prompts the user
+  /// with the interactive sign-in screen.
+  ///
+  /// The key fix to prevent the "deadlock" `PlatformException` is to call
+  /// `requestScopes` immediately after a successful sign-in, which ensures that
+  /// permissions are correctly registered before fetching the authenticated client.
   static Future<GoogleDriveProvider?> connect(
       {bool forceInteractive = false}) async {
-    // If already connected and not forcing interactive, return existing instance
+    // If already connected and not forcing a new interactive session, return the existing instance.
     if (_instance != null && _instance!._isAuthenticated && !forceInteractive) {
       debugPrint("GoogleDriveProvider: Already connected.");
       return _instance;
     }
 
+    // Initialize GoogleSignIn if it hasn't been already.
     _googleSignIn ??= GoogleSignIn(
       scopes: [
         MultiCloudStorage.cloudAccess == CloudAccessType.appStorage
-            ? drive.DriveApi
-                .driveAppdataScope // Use driveAppdataScope for appDataFolder
-            : drive.DriveApi.driveScope, // Full drive access
-        // You might need PeopleServiceApi.contactsReadonlyScope or other scopes
-        // if GSI complains about missing them, but for Drive, these should be enough.
+            ? drive.DriveApi.driveAppdataScope
+            : drive.DriveApi.driveScope,
       ],
-      // If you use serverClientId for offline access (refresh tokens which are longer-lived)
-      // This is highly recommended for "don't re-auth as long as possible"
-      // You need to create this OAuth 2.0 Client ID of type "Web application" in Google Cloud Console
+      // For persistent offline access, uncomment and provide your web client ID.
       // serverClientId: 'YOUR_SERVER_CLIENT_ID_FROM_GOOGLE_CLOUD_CONSOLE',
     );
 
     GoogleSignInAccount? account;
-    // The `authenticatedClient` extension method from `extension_google_sign_in_as_googleapis_auth`
-    // returns a `http.Client`.
-    http.Client? client;
 
     try {
+      // Attempt to sign in. First silently, then interactively if needed.
       if (!forceInteractive) {
-        debugPrint("GoogleDriveProvider: Attempting silent sign-in...");
         account = await _googleSignIn!.signInSilently();
       }
+      account ??= await _googleSignIn!.signIn();
 
+      // If account is null, the user cancelled the sign-in process.
       if (account == null) {
-        debugPrint(
-            "GoogleDriveProvider: Silent sign-in failed or interactive forced. Attempting interactive sign-in...");
-        account = await _googleSignIn!.signIn();
-        if (account == null) {
-          debugPrint(
-              "GoogleDriveProvider: Interactive sign-in cancelled by user.");
-          _instance?._isAuthenticated =
-              false; // Ensure state is false if it was previously true
-          return null; // User cancelled
-        }
-      }
-      debugPrint(
-          "GoogleDriveProvider: Sign-in successful for ${account.email}.");
-
-      // Get the authenticated client from the extension.
-      // This client will handle refreshing the access token automatically.
-      client = await _googleSignIn!.authenticatedClient();
-
-      if (client == null) {
-        debugPrint(
-            "GoogleDriveProvider: Failed to get authenticated client. User might not be signed in or credentials issue.");
-        await signOut(); // Sign out to clear any problematic state
-        _instance?._isAuthenticated = false;
+        debugPrint("GoogleDriveProvider: Sign-in process cancelled by user.");
         return null;
       }
 
-      debugPrint("GoogleDriveProvider: Authenticated client obtained.");
+      debugPrint(
+          "GoogleDriveProvider: Sign-in successful for ${account.email}.");
+
+      // *** KEY FIX ***
+      // Explicitly request scopes after sign-in. This is crucial for preventing the
+      // 'deadlock' PlatformException on Android by ensuring the auth state is
+      // fully synchronized before proceeding.
+      final bool hasPermissions =
+      await _googleSignIn!.requestScopes(_googleSignIn!.scopes);
+      if (!hasPermissions) {
+        debugPrint(
+            "GoogleDriveProvider: User did not grant necessary permissions.");
+        await signOut(); // Sign out to ensure a clean state.
+        return null;
+      }
+
+      // Now it's safe to get the authenticated client.
+      final client = await _googleSignIn!.authenticatedClient();
+
+      if (client == null) {
+        debugPrint(
+            "GoogleDriveProvider: Failed to get authenticated client after granting permissions.");
+        await signOut(); // Clean up on failure.
+        return null;
+      }
+
+      debugPrint("GoogleDriveProvider: Authenticated client obtained successfully.");
+
+      // Create or update the singleton instance with the authenticated client.
       final provider = _instance ?? GoogleDriveProvider._create();
-      // The drive.DriveApi constructor accepts the http.Client provided by the extension.
       provider.driveApi = drive.DriveApi(client);
       provider._isAuthenticated = true;
       _instance = provider;
+
       return _instance;
     } catch (error, stackTrace) {
-      debugPrint(
-          'GoogleDriveProvider: Error during sign-in or client retrieval: $error');
+      debugPrint('GoogleDriveProvider: Error during sign-in or client retrieval: $error');
       debugPrint(stackTrace.toString());
-      _instance?._isAuthenticated = false;
-      // Optionally sign out if a severe error occurs
-      // await signOut();
+      // On any error, sign out completely to avoid corrupt state.
+      await signOut();
       return null;
     }
   }
@@ -114,24 +120,29 @@ class GoogleDriveProvider extends CloudStorageProvider {
   // Method to sign out
   static Future<void> signOut() async {
     try {
-      await _googleSignIn?.disconnect(); // Revoke token
-      await _googleSignIn?.signOut(); // Sign out locally
+      // Disconnect revokes the token, signOut clears local auth cache.
+      await _googleSignIn?.disconnect();
+      await _googleSignIn?.signOut();
     } catch (e) {
       debugPrint("GoogleDriveProvider: Sign out error - $e");
+    } finally {
+      // Reset all static instances to ensure a fresh start next time.
+      _googleSignIn = null;
+      if (_instance != null) {
+        _instance!._isAuthenticated = false;
+        _instance = null;
+      }
+      debugPrint("GoogleDriveProvider: User signed out and state has been reset.");
     }
-
-    _googleSignIn = null; // Clear scopes & cached state
-    _instance?._isAuthenticated = false;
-    _instance = null; // Reset the singleton
-    debugPrint("GoogleDriveProvider: User signed out and GoogleSignIn reset.");
   }
 
   void _checkAuth() {
     if (!_isAuthenticated || _instance == null) {
       throw Exception(
-          'GoogleDriveProvider: Not authenticated or not properly initialized. Call connect() first.');
+          'GoogleDriveProvider: Not authenticated. Call connect() first.');
     }
   }
+
 
   // Helper to get the root folder ID based on access type
   Future<String> _getRootFolderId() async {
@@ -200,6 +211,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
   Future<String> uploadFileById({
     required String localPath,
     required String fileId,
+    String? subPath,
     Map<String, dynamic>? metadata,
   }) async {
     _checkAuth();
@@ -588,7 +600,6 @@ class GoogleDriveProvider extends CloudStorageProvider {
   @override
   Future<bool> tokenExpired() async {
     if (!_isAuthenticated || _instance == null) return true;
-
     try {
       // The authenticated client handles token refreshes automatically, but we can make a
       // lightweight call to check for connectivity and fundamental auth issues.
@@ -613,6 +624,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
   Future<String> getSharedFileById({
     required String fileId,
     required String localPath,
+    String? subPath,
   }) async {
     _checkAuth();
 

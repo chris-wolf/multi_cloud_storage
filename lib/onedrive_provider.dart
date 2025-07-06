@@ -222,6 +222,7 @@ class OneDriveProvider extends CloudStorageProvider {
   Future<String> getSharedFileById({
     required String fileId,
     required String localPath,
+    String? subPath,
   }) async {
     if (!_isAuthenticated) {
       throw Exception('Not authenticated');
@@ -260,6 +261,7 @@ class OneDriveProvider extends CloudStorageProvider {
   Future<String> uploadFileById({
     required String localPath,
     required String fileId,
+    String? subPath,
     Map<String, dynamic>? metadata,
   }) async {
     if (!_isAuthenticated) {
