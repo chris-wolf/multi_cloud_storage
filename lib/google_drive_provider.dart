@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:http/http.dart' as http;
+import 'package:http/retry.dart';
 import 'package:path/path.dart';
 
 import 'cloud_storage_provider.dart';
@@ -43,7 +44,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
       {bool forceInteractive = false}) async {
     // If already connected and not forcing a new interactive session, return the existing instance.
     if (_instance != null && _instance!._isAuthenticated && !forceInteractive) {
-      debugPrint("GoogleDriveProvider: Already connected.");
+      print("GoogleDriveProvider: Already connected.");
       return _instance;
     }
 
@@ -69,11 +70,11 @@ class GoogleDriveProvider extends CloudStorageProvider {
 
       // If account is null, the user cancelled the sign-in process.
       if (account == null) {
-        debugPrint("GoogleDriveProvider: Sign-in process cancelled by user.");
+        print("GoogleDriveProvider: Sign-in process cancelled by user.");
         return null;
       }
 
-      debugPrint(
+      print(
           "GoogleDriveProvider: Sign-in successful for ${account.email}.");
 
       // *** KEY FIX ***
@@ -83,7 +84,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
       final bool hasPermissions =
       await _googleSignIn!.requestScopes(_googleSignIn!.scopes);
       if (!hasPermissions) {
-        debugPrint(
+        print(
             "GoogleDriveProvider: User did not grant necessary permissions.");
         await signOut(); // Sign out to ensure a clean state.
         return null;
@@ -93,24 +94,43 @@ class GoogleDriveProvider extends CloudStorageProvider {
       final client = await _googleSignIn!.authenticatedClient();
 
       if (client == null) {
-        debugPrint(
+        print(
             "GoogleDriveProvider: Failed to get authenticated client after granting permissions.");
         await signOut(); // Clean up on failure.
         return null;
       }
 
-      debugPrint("GoogleDriveProvider: Authenticated client obtained successfully.");
+      final retryClient = RetryClient(
+        client,
+        retries: 3,
+        when: (response) {
+          const retryableStatuses = {
+            401, // Unauthorized (token expired)
+            403, // Forbidden (token expired)
+            500, // Internal Server Error
+            502, // Bad Gateway
+            503, // Service Unavailable
+            504, // Gateway Timeout
+          };
+          return retryableStatuses.contains(response.statusCode);
+        },
+        onRetry: (request, response, retryCount) {
+          debugPrint('Retrying request to ${request.url} (Retry #$retryCount)');
+        },
+      );
+
+      print("GoogleDriveProvider: Authenticated client obtained successfully.");
 
       // Create or update the singleton instance with the authenticated client.
       final provider = _instance ?? GoogleDriveProvider._create();
-      provider.driveApi = drive.DriveApi(client);
+      provider.driveApi = drive.DriveApi(retryClient);
       provider._isAuthenticated = true;
       _instance = provider;
 
       return _instance;
     } catch (error, stackTrace) {
-      debugPrint('GoogleDriveProvider: Error during sign-in or client retrieval: $error');
-      debugPrint(stackTrace.toString());
+      print('GoogleDriveProvider: Error during sign-in or client retrieval: $error');
+      print(stackTrace.toString());
       // On any error, sign out completely to avoid corrupt state.
       await signOut();
       return null;
@@ -124,7 +144,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
       await _googleSignIn?.disconnect();
       await _googleSignIn?.signOut();
     } catch (e) {
-      debugPrint("GoogleDriveProvider: Sign out error - $e");
+      print("GoogleDriveProvider: Sign out error - $e");
     } finally {
       // Reset all static instances to ensure a fresh start next time.
       _googleSignIn = null;
@@ -132,7 +152,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
         _instance!._isAuthenticated = false;
         _instance = null;
       }
-      debugPrint("GoogleDriveProvider: User signed out and state has been reset.");
+      print("GoogleDriveProvider: User signed out and state has been reset.");
     }
   }
 
@@ -165,7 +185,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
 
     if (existingFile != null && existingFile.id != null) {
       // If the file exists, update it using its ID.
-      debugPrint(
+      print(
           "GoogleDriveProvider: Found existing file at '$remotePath'. Updating it.");
       return uploadFileById(
         localPath: localPath,
@@ -174,7 +194,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
       );
     } else {
       // If the file does not exist, create it.
-      debugPrint(
+      print(
           "GoogleDriveProvider: No file at '$remotePath'. Creating a new one.");
       final file = File(localPath);
       final fileName = basename(remotePath);
@@ -190,13 +210,13 @@ class GoogleDriveProvider extends CloudStorageProvider {
       try {
         uploadedFile = await driveApi.files
             .create(driveFile, uploadMedia: media, $fields: 'id, name');
-        debugPrint(
+        print(
             "GoogleDriveProvider: Created new file '${uploadedFile.name}' with ID '${uploadedFile.id}'.");
       } catch (e) {
-        debugPrint("Error creating file during upload: $e");
+        print("Error creating file during upload: $e");
         if (e is drive.DetailedApiRequestError &&
             (e.status == 401 || e.status == 403)) {
-          debugPrint(
+          print(
               "Authentication error during create. The user may not have permission, or the token is invalid.");
           _isAuthenticated = false;
         }
@@ -231,10 +251,10 @@ class GoogleDriveProvider extends CloudStorageProvider {
         $fields: 'id',
       );
     } catch (e) {
-      debugPrint("Error uploading file by ID: $e");
+      print("Error uploading file by ID: $e");
       if (e is drive.DetailedApiRequestError &&
           (e.status == 401 || e.status == 403)) {
-        debugPrint(
+        print(
             "Authentication error during upload. The user may not have permission, or the token is invalid.");
         _isAuthenticated = false;
       }
@@ -273,10 +293,10 @@ class GoogleDriveProvider extends CloudStorageProvider {
       if (await output.exists()) {
         await output.delete();
       }
-      debugPrint("Error downloading file: $e");
+      print("Error downloading file: $e");
       if (e is drive.DetailedApiRequestError &&
           (e.status == 401 || e.status == 403)) {
-        debugPrint(
+        print(
             "Authentication error during download. The user may not have permission, or the token is invalid.");
         _isAuthenticated = false;
       }
@@ -296,7 +316,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
 
     final folder = await _getFolderByPath(path);
     if (folder == null || folder.id == null) {
-      debugPrint("GoogleDriveProvider: Folder not found at $path");
+      print("GoogleDriveProvider: Folder not found at $path");
       return [];
     }
 
@@ -387,11 +407,11 @@ class GoogleDriveProvider extends CloudStorageProvider {
       try {
         await driveApi.files.delete(file.id!);
       } catch (e) {
-        debugPrint("Error deleting file: $e");
+        print("Error deleting file: $e");
         rethrow;
       }
     } else {
-      debugPrint(
+      print(
           "GoogleDriveProvider: File/Folder to delete not found at $path");
     }
   }
@@ -448,7 +468,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
       if (folderName.isEmpty) continue;
       final folder = await _getFolderByName(currentFolder.id!, folderName);
       if (folder == null) {
-        debugPrint(
+        print(
             "GoogleDriveProvider: Intermediate folder '$folderName' not found in path '$filePath'");
         return null;
       }
@@ -538,7 +558,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
 
     final drive.File? file = await _getFileByPath(path);
     if (file == null || file.id == null) {
-      debugPrint("GoogleDriveProvider: File not found at $path");
+      print("GoogleDriveProvider: File not found at $path");
       return null;
     }
 
@@ -553,7 +573,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
         $fields: 'id',
       );
     } catch (e) {
-      debugPrint("Error setting permission for sharing: $e");
+      print("Error setting permission for sharing: $e");
       return null;
     }
 
@@ -564,7 +584,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
       ) as drive.File;
 
       if (fileMetadata.webViewLink == null) {
-        debugPrint("No webViewLink returned by API.");
+        print("No webViewLink returned by API.");
         return null;
       }
 
@@ -577,7 +597,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
 
       return shareableUri;
     } catch (e) {
-      debugPrint("Error getting shareable link: $e");
+      print("Error getting shareable link: $e");
       return null;
     }
   }
@@ -590,7 +610,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
         _isAuthenticated = false;
         return true;
       } catch (e) {
-        debugPrint("Logout failed: $e");
+        print("Logout failed: $e");
         return false;
       }
     }
@@ -644,10 +664,10 @@ class GoogleDriveProvider extends CloudStorageProvider {
       if (await output.exists()) {
         await output.delete();
       }
-      debugPrint("Error downloading shared file by ID: $e");
+      print("Error downloading shared file by ID: $e");
       if (e is drive.DetailedApiRequestError &&
           (e.status == 401 || e.status == 403)) {
-        debugPrint("Authentication error during download.");
+        print("Authentication error during download.");
         _isAuthenticated = false;
       }
       rethrow;
