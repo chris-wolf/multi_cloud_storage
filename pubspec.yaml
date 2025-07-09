@@ -23,6 +23,8 @@ dependencies:
   app_links: ^6.4.0
   flutter_secure_storage: ^9.2.4
   connectivity_plus: ^6.1.4
+  sentry_flutter: ^9.3.0
+  logger: ^2.6.0
 
 dev_dependencies:
   flutter_test:
