@@ -5,8 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_onedrive/flutter_onedrive.dart';
 import 'package:flutter_onedrive/token.dart';
 import 'package:http/http.dart' as http;
+import 'package:logger/logger.dart';
 
+import '../main.dart'; // Assuming your global logger is accessible via main.dart
 import 'cloud_storage_provider.dart';
+import 'file_log_output.dart'; // Assuming you have these custom classes
 import 'multi_cloud_storage.dart';
 
 class OneDriveProvider extends CloudStorageProvider {
@@ -27,26 +30,69 @@ class OneDriveProvider extends CloudStorageProvider {
     required String redirectUri,
     required BuildContext context,
   }) async {
-    if (clientId.trim().isEmpty) {
-      throw ArgumentError(
-          'App registration required: https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade');
-    }
-    if (redirectUri.isEmpty) {
-      redirectUri =
-          'https://login.microsoftonline.com/common/oauth2/nativeclient'; //fallback: use native redirect
-    }
-    final provider = OneDriveProvider._create(
-        clientId: clientId, redirectUri: redirectUri, context: context);
-    provider.client = OneDrive(
-      clientID: clientId,
-      redirectURL: redirectUri,
-    );
-    final success = await provider.client.connect(context);
-    if (success == false) {
+    logger.i("Connecting to OneDrive...");
+    try {
+      if (clientId.trim().isEmpty) {
+        throw ArgumentError(
+            'App registration required: https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade');
+      }
+      if (redirectUri.isEmpty) {
+        redirectUri =
+        'https://login.microsoftonline.com/common/oauth2/nativeclient'; //fallback: use native redirect
+        logger.d("Using native redirect URI for OneDrive.");
+      }
+      final provider = OneDriveProvider._create(
+          clientId: clientId, redirectUri: redirectUri, context: context);
+      provider.client = OneDrive(
+        clientID: clientId,
+        redirectURL: redirectUri,
+      );
+      final success = await provider.client.connect(context);
+      if (success == false) {
+        logger.w('OneDrive connection cancelled by user or failed.');
+        return null;
+      }
+      provider._isAuthenticated = true;
+      logger.i('OneDrive connected successfully.');
+      return provider;
+    } catch (error, stackTrace) {
+      logger.e(
+        'Error occurred during the OneDrive connect process.',
+        error: error,
+        stackTrace: stackTrace,
+      );
       return null;
     }
-    provider._isAuthenticated = true;
-    return provider;
+  }
+
+  void _checkAuth() {
+    if (!_isAuthenticated) {
+      throw Exception(
+          'OneDriveProvider: Not authenticated. Call connect() first.');
+    }
+  }
+
+  Future<T> _executeRequest<T>(
+      Future<T> Function() request, {
+        required String operation,
+      }) async {
+    _checkAuth();
+    try {
+      logger.d('Executing OneDrive operation: $operation');
+      return await request();
+    } catch (e, stackTrace) {
+      logger.e(
+        'Error during OneDrive operation: $operation',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      // Check for authentication-related errors
+      if (e.toString().contains('401') || e.toString().contains('invalid_grant')) {
+        _isAuthenticated = false;
+        logger.w('OneDrive token appears to be expired. User re-authentication is required.');
+      }
+      rethrow;
+    }
   }
 
   @override
@@ -54,155 +100,156 @@ class OneDriveProvider extends CloudStorageProvider {
     required String localPath,
     required String remotePath,
     Map<String, dynamic>? metadata,
-  }) async {
-    if (!_isAuthenticated) {
-      throw Exception('Not authenticated');
-    }
-    final file = File(localPath);
-    final bytes = await file.readAsBytes();
-    await client.push(bytes, remotePath,
-        isAppFolder:
+  }) {
+    return _executeRequest(
+          () async {
+        final file = File(localPath);
+        final bytes = await file.readAsBytes();
+        await client.push(bytes, remotePath,
+            isAppFolder:
             MultiCloudStorage.cloudAccess == CloudAccessType.appStorage);
-    return remotePath;
+        return remotePath;
+      },
+      operation: 'uploadFile to $remotePath',
+    );
   }
 
   @override
   Future<String> downloadFile({
     required String remotePath,
     required String localPath,
-  }) async {
-    if (!_isAuthenticated) {
-      throw Exception('Not authenticated');
-    }
-
-    final response = await client.pull(remotePath,
-        isAppFolder:
+  }) {
+    return _executeRequest(
+          () async {
+        final response = await client.pull(remotePath,
+            isAppFolder:
             MultiCloudStorage.cloudAccess == CloudAccessType.appStorage);
-    final file = File(localPath);
-    await file.writeAsBytes(response.bodyBytes!);
-
-    return localPath;
+        final file = File(localPath);
+        await file.writeAsBytes(response.bodyBytes!);
+        return localPath;
+      },
+      operation: 'downloadFile from $remotePath',
+    );
   }
 
   @override
   Future<List<CloudFile>> listFiles({
-    required String path,
+    String path = '',
     bool recursive = false,
-  }) async {
-    if (!_isAuthenticated) {
-      throw Exception('Not authenticated');
-    }
-    return (await client.listFiles(path,
+  }) {
+    return _executeRequest(
+          () async {
+        final files = await client.listFiles(path,
             recursive: recursive,
             isAppFolder:
-                MultiCloudStorage.cloudAccess == CloudAccessType.appStorage))
-        .map((dropboxFile) => CloudFile(
-            path: dropboxFile.path,
-            name: dropboxFile.name,
-            size: dropboxFile.size,
-            modifiedTime: DateTime.fromMillisecondsSinceEpoch(0),
-            isDirectory: dropboxFile.isFolder))
-        .toList();
-  }
-
-  @override
-  Future<void> deleteFile(String path) async {
-    await client.deleteFile(path,
-        isAppFolder:
             MultiCloudStorage.cloudAccess == CloudAccessType.appStorage);
+        return files
+            .map((oneDriveFile) => CloudFile(
+            path: oneDriveFile.path,
+            name: oneDriveFile.name,
+            size: oneDriveFile.size,
+            modifiedTime: DateTime.now(), // OneDrive SDK doesn't provide this
+            isDirectory: oneDriveFile.isFolder))
+            .toList();
+      },
+      operation: 'listFiles at $path',
+    );
   }
 
   @override
-  Future<void> createDirectory(String path) async {
-    if (!_isAuthenticated) {
-      throw Exception('Not authenticated');
-    }
-
-    await client.createDirectory(path,
-        isAppFolder:
-            MultiCloudStorage.cloudAccess == CloudAccessType.appStorage);
+  Future<void> deleteFile(String path) {
+    return _executeRequest(
+          () => client.deleteFile(path,
+          isAppFolder:
+          MultiCloudStorage.cloudAccess == CloudAccessType.appStorage),
+      operation: 'deleteFile at $path',
+    );
   }
 
   @override
-  Future<CloudFile> getFileMetadata(String path) async {
-    if (!_isAuthenticated) {
-      throw Exception('Not authenticated');
-    }
-
-    // Note: The package doesn't provide a direct get metadata method
-    // We'll need to implement this using the API directly
-    throw UnimplementedError('Get metadata functionality not implemented');
+  Future<void> createDirectory(String path) {
+    return _executeRequest(
+          () => client.createDirectory(path,
+          isAppFolder:
+          MultiCloudStorage.cloudAccess == CloudAccessType.appStorage),
+      operation: 'createDirectory at $path',
+    );
   }
 
   @override
-  Future<Uri?> generateSharableLink(String path) async {
-    if (!_isAuthenticated) {
-      throw Exception('Not authenticated');
-    }
+  Future<CloudFile> getFileMetadata(String path) {
+    return _executeRequest(
+          () async {
+        // The package doesn't provide a direct get metadata method.
+        // This is a placeholder for a potential future implementation.
+        throw UnimplementedError('Get metadata functionality not implemented');
+      },
+      operation: 'getFileMetadata for $path',
+    );
+  }
 
-    final accessToken = await DefaultTokenManager(
-      tokenEndpoint: OneDrive.tokenEndpoint,
-      clientID: client.clientID,
-      redirectURL: client.redirectURL,
-      scope: client.scopes,
-    ).getAccessToken();
-    if (accessToken == null || accessToken.isEmpty) {
-      debugPrint("OneDriveProvider: No access token available.");
-      return null;
-    }
+  @override
+  Future<Uri?> generateSharableLink(String path) {
+    return _executeRequest(
+          () async {
+        final accessToken = await DefaultTokenManager(
+          tokenEndpoint: OneDrive.tokenEndpoint,
+          clientID: client.clientID,
+          redirectURL: client.redirectURL,
+          scope: client.scopes,
+        ).getAccessToken();
+        if (accessToken == null || accessToken.isEmpty) {
+          logger.w("OneDriveProvider: No access token available for generating share link.");
+          return null;
+        }
 
-    final encodedPath =
-        Uri.encodeComponent(path.startsWith('/') ? path.substring(1) : path);
-    final driveItemPath = "/me/drive/root:/$encodedPath:/createLink";
+        final encodedPath = Uri.encodeComponent(path.startsWith('/') ? path.substring(1) : path);
+        final driveItemPath = "/me/drive/root:/$encodedPath:/createLink";
 
-    try {
-      final response = await http.post(
-        Uri.parse("https://graph.microsoft.com/v1.0$driveItemPath"),
-        headers: {
-          'Authorization': 'Bearer $accessToken',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          "type": "view", // or "edit" if you want an editable link
-          "scope": "anonymous"
-        }),
-      );
+        final response = await http.post(
+          Uri.parse("https://graph.microsoft.com/v1.0$driveItemPath"),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            "type": "view", // or "edit"
+            "scope": "anonymous"
+          }),
+        );
 
-      if (response.statusCode != 200) {
-        debugPrint(
-            "OneDriveProvider: Failed to create shareable link: ${response.body}");
-        return null;
-      }
+        if (response.statusCode != 200 && response.statusCode != 201) {
+          logger.e("Failed to create shareable link. Status: ${response.statusCode}, Body: ${response.body}");
+          return null;
+        }
 
-      final json = jsonDecode(response.body);
-      final link = json['link']?['webUrl'];
-      if (link == null) {
-        debugPrint("OneDriveProvider: No shareable link returned.");
-        return null;
-      }
-
-      // Append original path metadata as a query parameter
-      final shareableUri = Uri.parse(link).replace(
-        queryParameters: {
-          ...Uri.parse(link).queryParameters,
-          'originalPath': path,
-        },
-      );
-
-      return shareableUri;
-    } catch (e) {
-      debugPrint("OneDriveProvider: Error creating shareable link: $e");
-      return null;
-    }
+        final json = jsonDecode(response.body);
+        final link = json['link']?['webUrl'];
+        if (link == null) {
+          logger.w("No shareable link was returned in the API response.");
+          return null;
+        }
+        return Uri.parse(link);
+      },
+      operation: 'generateSharableLink for $path',
+    );
   }
 
   @override
   Future<bool> logout() async {
+    logger.i("Logging out from OneDrive...");
     if (_isAuthenticated) {
-      await client.disconnect();
-      _isAuthenticated = false;
-      return true;
+      try {
+        await client.disconnect();
+        _isAuthenticated = false;
+        logger.i("OneDrive logout successful.");
+        return true;
+      } catch (error, stackTrace) {
+        logger.e("Error during OneDrive logout.", error: error, stackTrace: stackTrace);
+        return false;
+      }
     }
+    logger.d("Already logged out from OneDrive.");
     return false;
   }
 
@@ -210,11 +257,19 @@ class OneDriveProvider extends CloudStorageProvider {
   Future<bool> tokenExpired() async {
     if (!_isAuthenticated) return true;
     try {
-      // Try a simple API call to check if token is valid
-      await client.listFiles('/');
-      return false;
+      // Perform a lightweight, authenticated call to check token validity
+      await _executeRequest(
+            () => client.listFiles('/',
+          isAppFolder: MultiCloudStorage.cloudAccess == CloudAccessType.appStorage,
+        ),
+        operation: 'tokenExpiredCheck',
+      );
+      return false; // Success means token is not expired
     } catch (e) {
-      return e.toString().contains('401') || e.toString().contains('403');
+      // _executeRequest already logged the error.
+      // If it was a 401 error, _isAuthenticated is now false.
+      // Any exception here implies the token is not valid.
+      return true;
     }
   }
 
@@ -223,38 +278,35 @@ class OneDriveProvider extends CloudStorageProvider {
     required String fileId,
     required String localPath,
     String? subPath,
-  }) async {
-    if (!_isAuthenticated) {
-      throw Exception('Not authenticated');
-    }
+  }) {
+    return _executeRequest(
+          () async {
+        final accessToken = await DefaultTokenManager(
+          tokenEndpoint: OneDrive.tokenEndpoint,
+          clientID: client.clientID,
+          redirectURL: client.redirectURL,
+          scope: client.scopes,
+        ).getAccessToken();
 
-    final accessToken = await DefaultTokenManager(
-      tokenEndpoint: OneDrive.tokenEndpoint,
-      clientID: client.clientID,
-      redirectURL: client.redirectURL,
-      scope: client.scopes,
-    ).getAccessToken();
+        if (accessToken == null || accessToken.isEmpty) {
+          throw Exception('Access token is null or empty');
+        }
 
-    if (accessToken == null || accessToken.isEmpty) {
-      throw Exception('Access token is null or empty');
-    }
+        final response = await http.get(
+          Uri.parse('https://graph.microsoft.com/v1.0/me/drive/items/$fileId/content'),
+          headers: {'Authorization': 'Bearer $accessToken'},
+        );
 
-    final response = await http.get(
-      Uri.parse(
-          'https://graph.microsoft.com/v1.0/me/drive/items/$fileId/content'),
-      headers: {
-        'Authorization': 'Bearer $accessToken',
+        if (response.statusCode != 200) {
+          throw Exception('Failed to download file by item ID: ${response.statusCode}, ${response.body}');
+        }
+
+        final file = File(localPath);
+        await file.writeAsBytes(response.bodyBytes);
+        return localPath;
       },
+      operation: 'getSharedFileById: $fileId',
     );
-
-    if (response.statusCode != 200) {
-      throw Exception(
-          'Failed to download file by item ID: ${response.statusCode}, ${response.body}');
-    }
-
-    final file = File(localPath);
-    await file.writeAsBytes(response.bodyBytes);
-    return localPath;
   }
 
   @override
@@ -263,66 +315,67 @@ class OneDriveProvider extends CloudStorageProvider {
     required String fileId,
     String? subPath,
     Map<String, dynamic>? metadata,
-  }) async {
-    if (!_isAuthenticated) {
-      throw Exception('Not authenticated');
-    }
+  }) {
+    return _executeRequest(
+          () async {
+        final accessToken = await DefaultTokenManager(
+          tokenEndpoint: OneDrive.tokenEndpoint,
+          clientID: client.clientID,
+          redirectURL: client.redirectURL,
+          scope: client.scopes,
+        ).getAccessToken();
 
-    final accessToken = await DefaultTokenManager(
-      tokenEndpoint: OneDrive.tokenEndpoint,
-      clientID: client.clientID,
-      redirectURL: client.redirectURL,
-      scope: client.scopes,
-    ).getAccessToken();
+        if (accessToken == null || accessToken.isEmpty) {
+          throw Exception('Access token is null or empty');
+        }
 
-    if (accessToken == null || accessToken.isEmpty) {
-      throw Exception('Access token is null or empty');
-    }
+        final fileBytes = await File(localPath).readAsBytes();
 
-    final fileBytes = await File(localPath).readAsBytes();
+        final response = await http.put(
+          Uri.parse('https://graph.microsoft.com/v1.0/me/drive/items/$fileId/content'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Content-Type': 'application/octet-stream',
+          },
+          body: fileBytes,
+        );
 
-    final response = await http.put(
-      Uri.parse(
-          'https://graph.microsoft.com/v1.0/me/drive/items/$fileId/content'),
-      headers: {
-        'Authorization': 'Bearer $accessToken',
-        'Content-Type': 'application/octet-stream',
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          return fileId;
+        } else {
+          throw Exception('Failed to upload file by ID: ${response.statusCode}, ${response.body}');
+        }
       },
-      body: fileBytes,
+      operation: 'uploadFileById: $fileId',
     );
-
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      return fileId;
-    } else {
-      throw Exception(
-          'Failed to upload file by ID: ${response.statusCode}, ${response.body}');
-    }
   }
 
   @override
-  Future<String?> extractFileIdFromSharableLink(Uri shareLink) async {
-    final accessToken = await DefaultTokenManager(
-      tokenEndpoint: OneDrive.tokenEndpoint,
-      clientID: client.clientID,
-      redirectURL: client.redirectURL,
-      scope: client.scopes,
-    ).getAccessToken();
-    final encoded = encodeShareUrl(shareLink);
+  Future<String?> extractFileIdFromSharableLink(Uri shareLink) {
+    return _executeRequest(
+          () async {
+        final accessToken = await DefaultTokenManager(
+          tokenEndpoint: OneDrive.tokenEndpoint,
+          clientID: client.clientID,
+          redirectURL: client.redirectURL,
+          scope: client.scopes,
+        ).getAccessToken();
+        final encoded = encodeShareUrl(shareLink);
 
-    final response = await http.get(
-      Uri.parse('https://graph.microsoft.com/v1.0/shares/u!$encoded/driveItem'),
-      headers: {
-        'Authorization': 'Bearer $accessToken',
+        final response = await http.get(
+          Uri.parse('https://graph.microsoft.com/v1.0/shares/u!$encoded/driveItem'),
+          headers: {'Authorization': 'Bearer $accessToken'},
+        );
+
+        if (response.statusCode == 200) {
+          final json = jsonDecode(response.body);
+          return json['id']; // actual OneDrive item ID
+        } else {
+          throw Exception('Failed to resolve item ID from link: ${response.statusCode}, ${response.body}');
+        }
       },
+      operation: 'extractFileIdFromSharableLink',
     );
-
-    if (response.statusCode == 200) {
-      final json = jsonDecode(response.body);
-      return json['id']; // actual OneDrive item ID
-    } else {
-      throw Exception(
-          'Failed to resolve item ID: ${response.statusCode}, ${response.body}');
-    }
   }
 
   String encodeShareUrl(Uri url) {
@@ -332,28 +385,29 @@ class OneDriveProvider extends CloudStorageProvider {
   }
 
   @override
-  Future<String?> loggedInUserDisplayName() async {
-    if (!_isAuthenticated) return null;
+  Future<String?> loggedInUserDisplayName() {
+    return _executeRequest(
+          () async {
+        final accessToken = await DefaultTokenManager(
+          tokenEndpoint: OneDrive.tokenEndpoint,
+          clientID: client.clientID,
+          redirectURL: client.redirectURL,
+          scope: client.scopes,
+        ).getAccessToken();
 
-    final accessToken = await DefaultTokenManager(
-      tokenEndpoint: OneDrive.tokenEndpoint,
-      clientID: client.clientID,
-      redirectURL: client.redirectURL,
-      scope: client.scopes,
-    ).getAccessToken();
+        if (accessToken == null || accessToken.isEmpty) return null;
 
-    if (accessToken == null || accessToken.isEmpty) return null;
+        final response = await http.get(
+          Uri.parse('https://graph.microsoft.com/v1.0/me'),
+          headers: {'Authorization': 'Bearer $accessToken'},
+        );
 
-    final response = await http.get(
-      Uri.parse('https://graph.microsoft.com/v1.0/me'),
-      headers: {
-        'Authorization': 'Bearer $accessToken',
+        if (response.statusCode != 200) return null;
+
+        final json = jsonDecode(response.body);
+        return json['displayName'] as String?;
       },
+      operation: 'loggedInUserDisplayName',
     );
-
-    if (response.statusCode != 200) return null;
-
-    final json = jsonDecode(response.body);
-    return json['displayName'] as String?;
   }
 }
