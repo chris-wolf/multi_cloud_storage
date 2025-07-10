@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/retry.dart';
 import 'package:logger/logger.dart';
 import 'package:path/path.dart';
+import 'package:googleapis_auth/googleapis_auth.dart';
 
 import '../main.dart'; // Assuming your global logger is accessible via main.dart
 import 'cloud_storage_provider.dart';
@@ -141,34 +142,42 @@ class GoogleDriveProvider extends CloudStorageProvider {
     }
   }
 
-  // --- 🚀 NEW: Centralized Request Execution with Retry Logic 🚀 ---
+  // Helper method to handle the reconnection and retry logic to avoid duplication.
+  Future<T> _handleAuthErrorAndRetry<T>(Future<T> Function() request, Object error, StackTrace stackTrace) async {
+    logger.w('Authentication error occurred. Attempting to reconnect...',
+        error: error,
+        stackTrace: stackTrace);
+    _isAuthenticated = false;
+
+    // Silently try to reconnect to refresh the token
+    final reconnectedProvider = await GoogleDriveProvider.connect();
+
+    if (reconnectedProvider != null && reconnectedProvider._isAuthenticated) {
+      logger.i('Successfully reconnected. Retrying the original request.');
+      // After reconnecting, the `driveApi` on this instance is updated.
+      // We can now retry the original request closure.
+      return await request();
+    } else {
+      logger.e('Failed to reconnect after auth error. Throwing original error.');
+      // If reconnection fails, rethrow the original error.
+      throw error;
+    }
+  }
+
   Future<T> _executeRequest<T>(Future<T> Function() request) async {
     _checkAuth();
     try {
-      // First attempt
+      // First attempt to execute the request
       return await request();
     } on drive.DetailedApiRequestError catch (e, stackTrace) {
-      // Handle expired token or permission errors
+      // Handle a specific API error from the drive package (e.g., permissions issue)
       if (e.status == 401 || e.status == 403) {
-        logger.w('Authentication token expired or invalid. Attempting to reconnect...',
-            error: e,
-            stackTrace: stackTrace);
-        _isAuthenticated = false;
-
-        // Silently try to reconnect to refresh the token
-        final reconnectedProvider = await GoogleDriveProvider.connect();
-
-        if (reconnectedProvider != null && reconnectedProvider._isAuthenticated) {
-          logger.i('Successfully reconnected. Retrying the original request.');
-          // Retry the request once more
-          return await request();
-        } else {
-          logger.e('Failed to reconnect after token expiration. Throwing original error.');
-          rethrow;
-        }
+        return _handleAuthErrorAndRetry(request, e, stackTrace);
       }
-      // For any other API error, rethrow
+      // For any other API error, just rethrow
       rethrow;
+    } on AccessDeniedException catch (e, stackTrace) {
+      return _handleAuthErrorAndRetry(request, e, stackTrace);
     }
   }
 
