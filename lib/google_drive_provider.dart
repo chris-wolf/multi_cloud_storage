@@ -18,7 +18,10 @@ import 'multi_cloud_storage.dart';
 // 3. The Logger Instance: Your global logger object
 final logger = Logger(
   filter: MyFilter(),      // Use your custom filter
-  output: FileLogOutput(),   // Use your custom file output
+  output: MultiOutput([
+    ConsoleOutput(),
+    FileLogOutput(),
+  ]),
   printer: PrettyPrinter(
     methodCount: 0,
     colors: false, // Set to false for file output

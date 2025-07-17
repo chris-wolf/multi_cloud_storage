@@ -271,7 +271,13 @@ class DropboxProvider extends CloudStorageProvider {
 
       final file = File(localPath);
       final sink = file.openWrite();
-      await response.data.stream.pipe(sink);
+
+      // The stream from Dio's response body
+      final Stream<Uint8List> stream = response.data.stream;
+
+      // FIX: Cast the stream to the type required by the IOSink before piping.
+      await stream.cast<List<int>>().pipe(sink);
+
       logger.i('Successfully downloaded file to $localPath');
       return localPath;
     });
@@ -633,25 +639,28 @@ class DropboxProvider extends CloudStorageProvider {
 
   @override
   Future<String> getSharedFileById({required String fileId, required String localPath, String? subPath}) async {
-    // fileId for Dropbox shared links is the URL itself.
-    // To download, we need to modify the URL slightly.
-    return _executeRequest(() async {
-      logger.d('Downloading shared Dropbox file: $fileId to $localPath');
-      final uri = Uri.parse(fileId).replace(queryParameters: {'dl': '1'});
+    // This method doesn't need _executeRequest as it downloads public links
+    logger.d('Downloading shared Dropbox file: $fileId to $localPath');
+    final uri = Uri.parse(fileId).replace(queryParameters: {'dl': '1'});
 
-      // Use a separate Dio instance for downloading public links (no auth needed)
-      final publicDio = Dio();
-      final response = await publicDio.get(
-        uri.toString(),
-        options: Options(responseType: ResponseType.stream),
-      );
+    // Use a separate Dio instance for downloading public links (no auth needed)
+    final publicDio = Dio();
+    final response = await publicDio.get(
+      uri.toString(),
+      options: Options(responseType: ResponseType.stream),
+    );
 
-      final file = File(localPath);
-      await file.openWrite().addStream(response.data.stream);
+    final file = File(localPath);
+    final sink = file.openWrite();
+    try {
+      // Correctly use addStream and ensure the sink is closed
+      await sink.addStream(response.data.stream);
+    } finally {
+      await sink.close();
+    }
 
-      logger.i('Successfully downloaded shared file to $localPath');
-      return localPath;
-    });
+    logger.i('Successfully downloaded shared file to $localPath');
+    return localPath;
   }
 
   @override

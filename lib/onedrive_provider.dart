@@ -30,40 +30,49 @@ class OneDriveProvider extends CloudStorageProvider {
     required String redirectUri,
     required BuildContext context,
   }) async {
-    logger.i("Connecting to OneDrive...");
-    try {
-      if (clientId.trim().isEmpty) {
-        throw ArgumentError(
-            'App registration required: https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade');
-      }
-      if (redirectUri.isEmpty) {
-        redirectUri =
-        'https://login.microsoftonline.com/common/oauth2/nativeclient'; //fallback: use native redirect
-        logger.d("Using native redirect URI for OneDrive.");
-      }
-      final provider = OneDriveProvider._create(
-          clientId: clientId, redirectUri: redirectUri, context: context);
-      provider.client = OneDrive(
-        clientID: clientId,
-        redirectURL: redirectUri,
-      );
-      final success = await provider.client.connect(context);
-      if (success == false) {
-        logger.w('OneDrive connection cancelled by user or failed.');
-        return null;
-      }
-      provider._isAuthenticated = true;
-      logger.i('OneDrive connected successfully.');
-      return provider;
-    } catch (error, stackTrace) {
-      logger.e(
-        'Error occurred during the OneDrive connect process.',
-        error: error,
-        stackTrace: stackTrace,
-      );
-      return null;
+    if (clientId.trim().isEmpty) {
+      throw ArgumentError(
+          'App registration required: https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade');
     }
+    if (redirectUri.isEmpty) {
+      redirectUri =
+      'https://login.microsoftonline.com/common/oauth2/nativeclient'; //fallback: use native redirect
+    }
+
+    final provider = OneDriveProvider._create(
+        clientId: clientId, redirectUri: redirectUri, context: context);
+
+    provider.client = OneDrive(
+      clientID: clientId,
+      redirectURL: redirectUri,
+    );
+
+    // 1. First, try to connect silently by checking for an existing token
+    final bool alreadyConnected = await provider.client.isConnected();
+
+    if (alreadyConnected) {
+      provider._isAuthenticated = true;
+      logger.i("OneDriveProvider: Silently connected successfully.");
+      return provider;
+    }
+
+    // 2. If not connected, proceed with the interactive login
+    logger.i("OneDriveProvider: Not connected, attempting interactive login...");
+    final success = await provider.client.connect(context);
+
+    if (success == false) {
+      logger.i("OneDriveProvider: Interactive login failed or was cancelled.");
+      return null; // User cancelled or login failed
+    }
+
+    provider._isAuthenticated = true;
+    logger.i("OneDriveProvider: Interactive login successful.");
+    return provider;
   }
+
+
+
+
 
   void _checkAuth() {
     if (!_isAuthenticated) {
