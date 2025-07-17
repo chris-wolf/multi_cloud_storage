@@ -147,6 +147,8 @@ flutter pub get
 #### Other platforms are untested but should work when following app_links documentation: https://pub.dev/packages/app_links
 
 
+### iCloud
+#### Follow the instructions here: https://pub.dev/packages/icloud_storage_sync#-how-to-set-up-icloud-container-and-enable-the-capability
 ---
 
 ## Usage
