@@ -21,11 +21,11 @@ class MultiCloudStorage {
           {bool forceInteractive = false}) =>
       GoogleDriveProvider.connect(forceInteractive: forceInteractive);
 
-  static Future<CloudStorageProvider?> connectToOneDrive({required String containerId}) =>
+  static Future<CloudStorageProvider?> connectToIcloud({required String containerId}) =>
       ICloudStorageProvider.connect(containerId: containerId);
 
 
-  static Future<CloudStorageProvider?> connectToIcloud({
+  static Future<CloudStorageProvider?> connectToOneDrive({
     required String clientId,
     required String redirectUri,
     required BuildContext context,
