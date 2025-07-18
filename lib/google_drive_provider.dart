@@ -228,7 +228,6 @@ class GoogleDriveProvider extends CloudStorageProvider {
   Future<String> uploadFileById({
     required String localPath,
     required String fileId,
-    String? subPath,
     Map<String, dynamic>? metadata,
   }) {
     return _executeRequest(() async {
@@ -499,8 +498,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
   @override
   Future<String> getSharedFileById({
     required String fileId,
-    required String localPath,
-    String? subPath,
+    required String localPath
   }) {
     return _executeRequest(() async {
       final output = File(localPath);

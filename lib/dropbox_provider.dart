@@ -628,17 +628,17 @@ class DropboxProvider extends CloudStorageProvider {
   }
 
   @override
-  Future<String> uploadFileById({required String localPath, required String fileId, String? subPath, Map<String, dynamic>? metadata}) async {
+  Future<String> uploadFileById({required String localPath, required String fileId, Map<String, dynamic>? metadata}) async {
     // Dropbox API primarily uses paths, not IDs, for uploads.
     // If 'fileId' is a path, we can just call the standard upload.
     // This assumes the fileId is the full remote path to the file.
     logger.i("uploadFileById called, which for Dropbox is an alias for uploadFile with path: $fileId");
-    String remotePath = subPath != null ? p.join(fileId, subPath) : fileId;
+    String remotePath = fileId;
     return uploadFile(localPath: localPath, remotePath: remotePath, metadata: metadata);
   }
 
   @override
-  Future<String> getSharedFileById({required String fileId, required String localPath, String? subPath}) async {
+  Future<String> getSharedFileById({required String fileId, required String localPath}) async {
     // This method doesn't need _executeRequest as it downloads public links
     logger.d('Downloading shared Dropbox file: $fileId to $localPath');
     final uri = Uri.parse(fileId).replace(queryParameters: {'dl': '1'});

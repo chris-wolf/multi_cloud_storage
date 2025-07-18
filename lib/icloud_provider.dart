@@ -32,8 +32,8 @@ class ICloudStorageProvider extends CloudStorageProvider {
   static Future<ICloudStorageProvider?> connect({required String containerId}) async {
     // iCloud is only available on iOS.
     if (Platform.isIOS == false && Platform.isMacOS == false) {
-      debugPrint('iCloud Storage is only available on iOS.');
-      throw UnsupportedError('iCloud Storage is only available on iOS or MacOs.');
+      debugPrint('iCloud Storage is only available on iOS and.');
+      throw UnsupportedError('iCloud Storage is only available on iOS and MacOs.');
     }
     _instance ??= ICloudStorageProvider._create(containerId);
     return _instance;
@@ -144,13 +144,9 @@ class ICloudStorageProvider extends CloudStorageProvider {
   Future<String> uploadFileById({
     required String localPath,
     required String fileId, // For iCloud, the 'fileId' is the 'remotePath'.
-    String? subPath, // Sub-paths are not applicable here.
     Map<String, dynamic>? metadata,
   }) async {
-    // In iCloud's path-based system, updating a file is the same as uploading
-    // to the same destination path, which overwrites the existing file.
-    return uploadFile(
-        localPath: localPath, remotePath: fileId, metadata: metadata);
+   throw UnsupportedError('iCloud doesn\'t allow sharing of files since each app has its own container');
   }
 
   @override
@@ -163,6 +159,7 @@ class ICloudStorageProvider extends CloudStorageProvider {
 
   @override
   Future<bool> logout() async {
+    _instance = null;
     return true; // nothing todo
   }
 
@@ -194,8 +191,7 @@ class ICloudStorageProvider extends CloudStorageProvider {
   @override
   Future<String> getSharedFileById({
     required String fileId,
-    required String localPath,
-    String? subPath,
+    required String localPath
   }) {
     // The package does not support sharing.
     throw UnimplementedError('iCloudProvider: Sharing functionality is not supported.');
