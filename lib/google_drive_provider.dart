@@ -1,23 +1,21 @@
 import 'dart:io';
 
 import 'package:extension_google_sign_in_as_googleapis_auth/extension_google_sign_in_as_googleapis_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
-import 'package:http/http.dart' as http;
 import 'package:http/retry.dart';
 import 'package:logger/logger.dart';
 import 'package:path/path.dart';
 import 'package:googleapis_auth/googleapis_auth.dart';
 
-import '../main.dart'; // Assuming your global logger is accessible via main.dart
+// Assuming your global logger is accessible via main.dart
 import 'cloud_storage_provider.dart';
 import 'file_log_output.dart';
 import 'multi_cloud_storage.dart';
 
 // 3. The Logger Instance: Your global logger object
 final logger = Logger(
-  filter: MyFilter(),      // Use your custom filter
+  filter: MyFilter(), // Use your custom filter
   output: MultiOutput([
     ConsoleOutput(),
     FileLogOutput(),
@@ -74,7 +72,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
       }
 
       final bool hasPermissions =
-      await _googleSignIn!.requestScopes(_googleSignIn!.scopes);
+          await _googleSignIn!.requestScopes(_googleSignIn!.scopes);
       if (!hasPermissions) {
         logger.w('User did not grant necessary Google Drive permissions.');
         await signOut();
@@ -93,8 +91,8 @@ class GoogleDriveProvider extends CloudStorageProvider {
       final retryClient = RetryClient(
         client,
         retries: 3,
-        when: (response) =>
-            {500, 502, 503, 504}.contains(response.statusCode), // Removed 401/403
+        when: (response) => {500, 502, 503, 504}
+            .contains(response.statusCode), // Removed 401/403
         onRetry: (request, response, retryCount) =>
             logger.d('Retrying request to ${request.url} (Retry #$retryCount)'),
       );
@@ -104,7 +102,8 @@ class GoogleDriveProvider extends CloudStorageProvider {
       provider._isAuthenticated = true;
       _instance = provider;
 
-      logger.i('Google Drive user signed in: ID=${account.id}, Email=${account.email}');
+      logger.i(
+          'Google Drive user signed in: ID=${account.id}, Email=${account.email}');
 
       return _instance;
     } catch (error, stackTrace) {
@@ -146,10 +145,10 @@ class GoogleDriveProvider extends CloudStorageProvider {
   }
 
   // Helper method to handle the reconnection and retry logic to avoid duplication.
-  Future<T> _handleAuthErrorAndRetry<T>(Future<T> Function() request, Object error, StackTrace stackTrace) async {
+  Future<T> _handleAuthErrorAndRetry<T>(
+      Future<T> Function() request, Object error, StackTrace stackTrace) async {
     logger.w('Authentication error occurred. Attempting to reconnect...',
-        error: error,
-        stackTrace: stackTrace);
+        error: error, stackTrace: stackTrace);
     _isAuthenticated = false;
 
     // Silently try to reconnect to refresh the token
@@ -161,7 +160,8 @@ class GoogleDriveProvider extends CloudStorageProvider {
       // We can now retry the original request closure.
       return await request();
     } else {
-      logger.e('Failed to reconnect after auth error. Throwing original error.');
+      logger
+          .e('Failed to reconnect after auth error. Throwing original error.');
       // If reconnection fails, rethrow the original error.
       throw error;
     }
@@ -256,13 +256,14 @@ class GoogleDriveProvider extends CloudStorageProvider {
       final sink = output.openWrite();
 
       try {
-        final media = await driveApi.files
-            .get(file.id!, downloadOptions: drive.DownloadOptions.fullMedia)
-        as drive.Media;
+        final media = await driveApi.files.get(file.id!,
+            downloadOptions: drive.DownloadOptions.fullMedia) as drive.Media;
         await media.stream.pipe(sink);
       } catch (e) {
         await sink.close(); // Ensure sink is closed on error
-        if (await output.exists()) await output.delete(); // Clean up partial file
+        if (await output.exists()) {
+          await output.delete(); // Clean up partial file
+        }
         rethrow;
       }
       await sink.close();
@@ -288,7 +289,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
               : 'drive',
           q: "'${folder.id}' in parents and trashed = false",
           $fields:
-          'nextPageToken, files(id, name, size, modifiedTime, mimeType, parents)',
+              'nextPageToken, files(id, name, size, modifiedTime, mimeType, parents)',
           pageToken: pageToken,
         );
         if (fileList.files != null) {
@@ -301,7 +302,8 @@ class GoogleDriveProvider extends CloudStorageProvider {
               name: file.name ?? 'Unnamed',
               size: file.size == null ? null : int.tryParse(file.size!),
               modifiedTime: file.modifiedTime ?? DateTime.now(),
-              isDirectory: file.mimeType == 'application/vnd.google-apps.folder',
+              isDirectory:
+                  file.mimeType == 'application/vnd.google-apps.folder',
               metadata: {
                 'id': file.id,
                 'mimeType': file.mimeType,
@@ -317,7 +319,8 @@ class GoogleDriveProvider extends CloudStorageProvider {
         final List<CloudFile> subFolderFiles = [];
         for (final cf in cloudFiles) {
           if (cf.isDirectory) {
-            subFolderFiles.addAll(await listFiles(path: cf.path, recursive: true));
+            subFolderFiles
+                .addAll(await listFiles(path: cf.path, recursive: true));
           }
         }
         cloudFiles.addAll(subFolderFiles);
@@ -371,8 +374,9 @@ class GoogleDriveProvider extends CloudStorageProvider {
     if (folderPath.isEmpty || folderPath == '.' || folderPath == '/') {
       return _getRootFolder();
     }
-    final parts = split(
-        folderPath.replaceAll(RegExp(r'^/+'), '').replaceAll(RegExp(r'/+$'), ''));
+    final parts = split(folderPath
+        .replaceAll(RegExp(r'^/+'), '')
+        .replaceAll(RegExp(r'/+$'), ''));
     if (parts.isEmpty || (parts.length == 1 && parts[0].isEmpty)) {
       return _getRootFolder();
     }
@@ -392,7 +396,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
     }
 
     final normalizedPath =
-    filePath.replaceAll(RegExp(r'^/+'), '').replaceAll(RegExp(r'/+$'), '');
+        filePath.replaceAll(RegExp(r'^/+'), '').replaceAll(RegExp(r'/+$'), '');
     if (normalizedPath.isEmpty) return _getRootFolder();
 
     final parts = split(normalizedPath);
@@ -427,8 +431,9 @@ class GoogleDriveProvider extends CloudStorageProvider {
     if (folderPath.isEmpty || folderPath == '.' || folderPath == '/') {
       return _getRootFolder();
     }
-    final normalizedPath =
-    folderPath.replaceAll(RegExp(r'^/+'), '').replaceAll(RegExp(r'/+$'), '');
+    final normalizedPath = folderPath
+        .replaceAll(RegExp(r'^/+'), '')
+        .replaceAll(RegExp(r'/+$'), '');
     if (normalizedPath.isEmpty) return _getRootFolder();
 
     final parts = split(normalizedPath);
@@ -496,17 +501,14 @@ class GoogleDriveProvider extends CloudStorageProvider {
   }
 
   @override
-  Future<String> downloadFileByShareToken({
-    required String shareToken,
-    required String localPath
-  }) {
+  Future<String> downloadFileByShareToken(
+      {required String shareToken, required String localPath}) {
     return _executeRequest(() async {
       final output = File(localPath);
       final sink = output.openWrite();
       try {
-        final media = await driveApi.files
-            .get(shareToken, downloadOptions: drive.DownloadOptions.fullMedia)
-        as drive.Media;
+        final media = await driveApi.files.get(shareToken,
+            downloadOptions: drive.DownloadOptions.fullMedia) as drive.Media;
         await media.stream.pipe(sink);
       } finally {
         await sink.close();

@@ -13,17 +13,20 @@ class MultiCloudStorage {
           {required String appKey,
           required String appSecret,
           required String redirectUri,
-            bool forceInteractive = false}) =>
+          bool forceInteractive = false}) =>
       DropboxProvider.connect(
-          appKey: appKey, appSecret: appSecret, redirectUri: redirectUri, forceInteractive: forceInteractive);
+          appKey: appKey,
+          appSecret: appSecret,
+          redirectUri: redirectUri,
+          forceInteractive: forceInteractive);
 
   static Future<CloudStorageProvider?> connectToGoogleDrive(
           {bool forceInteractive = false}) =>
       GoogleDriveProvider.connect(forceInteractive: forceInteractive);
 
-  static Future<CloudStorageProvider?> connectToIcloud({required String containerId}) =>
+  static Future<CloudStorageProvider?> connectToIcloud(
+          {required String containerId}) =>
       ICloudStorageProvider.connect(containerId: containerId);
-
 
   static Future<CloudStorageProvider?> connectToOneDrive({
     required String clientId,
@@ -32,7 +35,10 @@ class MultiCloudStorage {
     String? scopes,
   }) =>
       OneDriveProvider.connect(
-          clientId: clientId, redirectUri: redirectUri, context: context, scopes: scopes);
+          clientId: clientId,
+          redirectUri: redirectUri,
+          context: context,
+          scopes: scopes);
 }
 
 enum CloudAccessType { appStorage, fullAccess }

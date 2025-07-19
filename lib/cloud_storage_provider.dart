@@ -9,7 +9,6 @@ abstract class CloudStorageProvider {
     Map<String, dynamic>? metadata,
   });
 
-
   /// Downloads a file from the cloud storage.
   Future<String> downloadFile({
     required String remotePath,
@@ -41,11 +40,8 @@ abstract class CloudStorageProvider {
 
   Future<String?> getShareTokenFromShareLink(Uri shareLink);
 
-  Future<String> downloadFileByShareToken({
-    required String shareToken,
-    required String localPath
-  });
-
+  Future<String> downloadFileByShareToken(
+      {required String shareToken, required String localPath});
 
   /// Uploads a file to the cloud storage.
   Future<String> uploadFileByShareToken({

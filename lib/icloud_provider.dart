@@ -1,8 +1,6 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
-import 'package:googleapis/iap/v1.dart';
 import 'package:icloud_storage_sync/icloud_storage_sync.dart';
 import 'package:icloud_storage_sync/models/icloud_file.dart';
 import 'package:path/path.dart' as p;
@@ -29,11 +27,13 @@ class ICloudStorageProvider extends CloudStorageProvider {
   ///
   /// This method requires the iCloud [containerId] specific to your app.
   /// It will throw an [UnsupportedError] if called on a non-iOS platform.
-  static Future<ICloudStorageProvider?> connect({required String containerId}) async {
+  static Future<ICloudStorageProvider?> connect(
+      {required String containerId}) async {
     // iCloud is only available on iOS.
     if (Platform.isIOS == false && Platform.isMacOS == false) {
       debugPrint('iCloud Storage is only available on iOS and.');
-      throw UnsupportedError('iCloud Storage is only available on iOS and MacOs.');
+      throw UnsupportedError(
+          'iCloud Storage is only available on iOS and MacOs.');
     }
     _instance ??= ICloudStorageProvider._create(containerId);
     return _instance;
@@ -81,7 +81,8 @@ class ICloudStorageProvider extends CloudStorageProvider {
     final List<CloudFile> results = [];
 
     // Normalize the directory path for consistent comparison.
-    final normalizedPath = path == '/' ? '' : path.replaceAll(RegExp(r'/$'), '');
+    final normalizedPath =
+        path == '/' ? '' : path.replaceAll(RegExp(r'/$'), '');
 
     for (final icloudFile in allFiles) {
       final itemPath = icloudFile.relativePath;
@@ -95,7 +96,8 @@ class ICloudStorageProvider extends CloudStorageProvider {
         // For non-recursive, check if the item is a direct child.
         // The parent directory of the item should be the same as the target path.
         final parentDir = p.dirname(itemPath);
-        final rootEquivalent = parentDir == '.' && (normalizedPath.isEmpty || normalizedPath == '/');
+        final rootEquivalent = parentDir == '.' &&
+            (normalizedPath.isEmpty || normalizedPath == '/');
 
         if (parentDir == normalizedPath || rootEquivalent) {
           results.add(_mapToCloudFile(icloudFile));
@@ -117,8 +119,9 @@ class ICloudStorageProvider extends CloudStorageProvider {
   Future<CloudFile> getFileMetadata(String path) async {
     final allFiles = await _icloudSync.gather(containerId: _containerId);
     final foundFile = allFiles.firstWhere(
-          (f) => f.relativePath == path,
-      orElse: () => throw Exception('iCloudProvider: File not found at path: $path'),
+      (f) => f.relativePath == path,
+      orElse: () =>
+          throw Exception('iCloudProvider: File not found at path: $path'),
     );
     return _mapToCloudFile(foundFile);
   }
@@ -146,7 +149,8 @@ class ICloudStorageProvider extends CloudStorageProvider {
     required String shareToken,
     Map<String, dynamic>? metadata,
   }) async {
-   throw UnsupportedError('iCloud doesn\'t allow sharing of files since each app has its own container');
+    throw UnsupportedError(
+        'iCloud doesn\'t allow sharing of files since each app has its own container');
   }
 
   @override
@@ -154,7 +158,8 @@ class ICloudStorageProvider extends CloudStorageProvider {
     // The `iCloud_Storage_Sync` package does not provide a method to explicitly
     // create an empty directory. Directories are created implicitly when a file
     // is uploaded into a non-existent path.
-    throw UnimplementedError('iCloudProvider: createDirectory is not supported. Directories are created automatically upon file upload.');
+    throw UnimplementedError(
+        'iCloudProvider: createDirectory is not supported. Directories are created automatically upon file upload.');
   }
 
   @override
@@ -173,27 +178,29 @@ class ICloudStorageProvider extends CloudStorageProvider {
   @override
   Future<String?> loggedInUserDisplayName() {
     // The package does not provide access to user information like display name.
-    throw UnimplementedError('iCloudProvider: Cannot retrieve user display name.');
+    throw UnimplementedError(
+        'iCloudProvider: Cannot retrieve user display name.');
   }
 
   @override
   Future<Uri?> generateShareLink(String path) {
     // The package does not support creating sharable links.
-    throw UnimplementedError('iCloudProvider: Generating sharable links is not supported.');
+    throw UnimplementedError(
+        'iCloudProvider: Generating sharable links is not supported.');
   }
 
   @override
   Future<String?> getShareTokenFromShareLink(Uri shareLink) {
     // The package does not support sharing.
-    throw UnimplementedError('iCloudProvider: Sharing functionality is not supported.');
+    throw UnimplementedError(
+        'iCloudProvider: Sharing functionality is not supported.');
   }
 
   @override
-  Future<String> downloadFileByShareToken({
-    required String shareToken,
-    required String localPath
-  }) {
+  Future<String> downloadFileByShareToken(
+      {required String shareToken, required String localPath}) {
     // The package does not support sharing.
-    throw UnimplementedError('iCloudProvider: Sharing functionality is not supported.');
+    throw UnimplementedError(
+        'iCloudProvider: Sharing functionality is not supported.');
   }
 }

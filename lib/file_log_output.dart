@@ -24,7 +24,6 @@ class FileLogOutput extends LogOutput {
   }
 }
 
-
 class MyFilter extends LogFilter {
   @override
   bool shouldLog(LogEvent event) {

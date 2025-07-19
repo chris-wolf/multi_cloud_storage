@@ -36,15 +36,16 @@ class _CloudStorageExampleState extends State<CloudStorageExample> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (Platform.isIOS || Platform.isMacOS)
-                ElevatedButton(
-                  child: Text('iCloud'),
-                  onPressed: () async {
-                    final provider = await MultiCloudStorage.connectToIcloud(containerId: '');
-                    if (provider != null && context.mounted) {
-                      openExplorer(context, provider);
-                    }
-                  },
-                ),
+                  ElevatedButton(
+                    child: Text('iCloud'),
+                    onPressed: () async {
+                      final provider = await MultiCloudStorage.connectToIcloud(
+                          containerId: '');
+                      if (provider != null && context.mounted) {
+                        openExplorer(context, provider);
+                      }
+                    },
+                  ),
                 ElevatedButton(
                   child: Text('Dropbox'),
                   onPressed: () async {

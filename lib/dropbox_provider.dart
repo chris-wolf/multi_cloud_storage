@@ -9,11 +9,10 @@ import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:logger/logger.dart';
 import 'package:path/path.dart' as p;
 import 'package:url_launcher/url_launcher.dart';
 
-import '../main.dart'; // Assuming your global logger is accessible via main.dart
+// Assuming your global logger is accessible via main.dart
 import 'cloud_storage_provider.dart';
 import 'file_log_output.dart';
 
@@ -51,11 +50,11 @@ class DropboxToken {
   }
 
   Map<String, dynamic> toJson() => {
-    'access_token': accessToken,
-    'refresh_token': refreshToken,
-    'token_type': tokenType,
-    'expires_in': expiresIn.toIso8601String(),
-  };
+        'access_token': accessToken,
+        'refresh_token': refreshToken,
+        'token_type': tokenType,
+        'expires_in': expiresIn.toIso8601String(),
+      };
 
   bool get isExpired =>
       DateTime.now().isAfter(expiresIn.subtract(const Duration(minutes: 5)));
@@ -78,7 +77,7 @@ class DropboxAccount {
       accountId: json['account_id'] as String,
       email: json['email'] as String,
       displayName:
-      (json['name'] as Map<String, dynamic>)['display_name'] as String,
+          (json['name'] as Map<String, dynamic>)['display_name'] as String,
     );
   }
 }
@@ -106,8 +105,7 @@ class DropboxProvider extends CloudStorageProvider {
     required String appKey,
     required String appSecret,
     required String redirectUri,
-  })
-      : _appKey = appKey,
+  })  : _appKey = appKey,
         _appSecret = appSecret,
         _redirectUri = redirectUri {
     _initializeDio();
@@ -127,7 +125,8 @@ class DropboxProvider extends CloudStorageProvider {
     }
 
     if (appKey.isEmpty || appSecret.isEmpty || redirectUri.isEmpty) {
-      logger.e('Dropbox connection failed: App Key, Secret, or Redirect URI is missing.');
+      logger.e(
+          'Dropbox connection failed: App Key, Secret, or Redirect URI is missing.');
       return null;
     }
 
@@ -150,7 +149,8 @@ class DropboxProvider extends CloudStorageProvider {
         }
         await provider._fetchCurrentUserAccount();
         provider._isAuthenticated = true;
-        logger.i('Dropbox silent sign-in successful for ${provider._account?.email}');
+        logger.i(
+            'Dropbox silent sign-in successful for ${provider._account?.email}');
         return provider;
       }
 
@@ -163,9 +163,9 @@ class DropboxProvider extends CloudStorageProvider {
 
       await provider._completeConnection(authCode);
       await provider._saveToken(provider._token);
-      logger.i('Interactive Dropbox login successful for ${provider._account?.email}');
+      logger.i(
+          'Interactive Dropbox login successful for ${provider._account?.email}');
       return provider;
-
     } catch (error, stackTrace) {
       logger.e(
         'Error occurred during the Dropbox connect process. Clearing credentials.',
@@ -183,9 +183,11 @@ class DropboxProvider extends CloudStorageProvider {
     try {
       return await request();
     } on DioException catch (e, stackTrace) {
-      logger.e('A DioException occurred in Dropbox request', error: e, stackTrace: stackTrace);
+      logger.e('A DioException occurred in Dropbox request',
+          error: e, stackTrace: stackTrace);
       if (e.response?.statusCode == 401) {
-        logger.w('Dropbox request failed with 401. Possible token invalidation.');
+        logger
+            .w('Dropbox request failed with 401. Possible token invalidation.');
         // The interceptor handles automatic refresh. If it still fails,
         // it indicates a more serious issue (e.g., revoked access).
         await logout(); // Force logout to clear bad state
@@ -199,11 +201,11 @@ class DropboxProvider extends CloudStorageProvider {
       }
       rethrow;
     } catch (e, stackTrace) {
-      logger.e('An unexpected error occurred in Dropbox request', error: e, stackTrace: stackTrace);
+      logger.e('An unexpected error occurred in Dropbox request',
+          error: e, stackTrace: stackTrace);
       rethrow;
     }
   }
-
 
   @override
   Future<String?> loggedInUserDisplayName() async => _account?.displayName;
@@ -216,7 +218,9 @@ class DropboxProvider extends CloudStorageProvider {
         await _dio.post('https://api.dropboxapi.com/2/auth/token/revoke');
         logger.i('Successfully revoked Dropbox token via API.');
       } catch (e) {
-        logger.w('Failed to revoke Dropbox token via API, but logging out locally anyway.', error: e);
+        logger.w(
+            'Failed to revoke Dropbox token via API, but logging out locally anyway.',
+            error: e);
       }
     }
     await _clearToken();
@@ -227,7 +231,10 @@ class DropboxProvider extends CloudStorageProvider {
   }
 
   @override
-  Future<String> uploadFile({required String localPath, required String remotePath, Map<String, dynamic>? metadata}) {
+  Future<String> uploadFile(
+      {required String localPath,
+      required String remotePath,
+      Map<String, dynamic>? metadata}) {
     return _executeRequest(() async {
       final file = File(localPath);
       final fileSize = await file.length();
@@ -250,13 +257,15 @@ class DropboxProvider extends CloudStorageProvider {
           },
         ),
       );
-      logger.i('Successfully uploaded file to Dropbox, ID: ${response.data['id']}');
+      logger.i(
+          'Successfully uploaded file to Dropbox, ID: ${response.data['id']}');
       return response.data['id'];
     });
   }
 
   @override
-  Future<String> downloadFile({required String remotePath, required String localPath}) {
+  Future<String> downloadFile(
+      {required String remotePath, required String localPath}) {
     return _executeRequest(() async {
       final normalizedPath = _normalizePath(remotePath);
       logger.d('Downloading from Dropbox path: $normalizedPath to $localPath');
@@ -264,7 +273,9 @@ class DropboxProvider extends CloudStorageProvider {
       final response = await _dio.post(
         'https://content.dropboxapi.com/2/files/download',
         options: Options(
-          headers: {'Dropbox-API-Arg': jsonEncode({'path': normalizedPath})},
+          headers: {
+            'Dropbox-API-Arg': jsonEncode({'path': normalizedPath})
+          },
           responseType: ResponseType.stream,
         ),
       );
@@ -284,21 +295,24 @@ class DropboxProvider extends CloudStorageProvider {
   }
 
   @override
-  Future<List<CloudFile>> listFiles({String path = '', bool recursive = false}) {
+  Future<List<CloudFile>> listFiles(
+      {String path = '', bool recursive = false}) {
     return _executeRequest(() async {
       final List<CloudFile> allFiles = [];
       String? cursor;
       bool hasMore = true;
       String initialPath = path == '/' ? '' : _normalizePath(path);
 
-      logger.d('Listing files in Dropbox path: "$initialPath", recursive: $recursive');
+      logger.d(
+          'Listing files in Dropbox path: "$initialPath", recursive: $recursive');
 
       while (hasMore) {
         Response response;
         if (cursor == null) {
           response = await _dio.post(
             'https://api.dropboxapi.com/2/files/list_folder',
-            data: jsonEncode({'path': initialPath, 'recursive': recursive, 'limit': 1000}),
+            data: jsonEncode(
+                {'path': initialPath, 'recursive': recursive, 'limit': 1000}),
             options: Options(contentType: 'application/json'),
           );
         } else {
@@ -311,7 +325,8 @@ class DropboxProvider extends CloudStorageProvider {
         }
 
         final entries = response.data['entries'] as List;
-        allFiles.addAll(entries.map((e) => _mapToCloudFile(e as Map<String, dynamic>)));
+        allFiles.addAll(
+            entries.map((e) => _mapToCloudFile(e as Map<String, dynamic>)));
 
         hasMore = response.data['has_more'] as bool;
         cursor = response.data['cursor'] as String?;
@@ -334,8 +349,11 @@ class DropboxProvider extends CloudStorageProvider {
         );
         logger.i('Successfully deleted path: $normalizedPath');
       } on DioException catch (e) {
-        if (e.response?.data?['error_summary']?.contains('path_lookup/not_found') == true) {
-          logger.w('Path not found during deletion, considering it a success: $normalizedPath');
+        if (e.response?.data?['error_summary']
+                ?.contains('path_lookup/not_found') ==
+            true) {
+          logger.w(
+              'Path not found during deletion, considering it a success: $normalizedPath');
         } else {
           rethrow;
         }
@@ -356,8 +374,11 @@ class DropboxProvider extends CloudStorageProvider {
         );
         logger.i('Successfully created directory: $normalizedPath');
       } on DioException catch (e) {
-        if (e.response?.data?['error_summary']?.contains('path/conflict/folder') == true) {
-          logger.w('Directory already exists, ignoring creation: $normalizedPath');
+        if (e.response?.data?['error_summary']
+                ?.contains('path/conflict/folder') ==
+            true) {
+          logger.w(
+              'Directory already exists, ignoring creation: $normalizedPath');
         } else {
           rethrow;
         }
@@ -399,17 +420,21 @@ class DropboxProvider extends CloudStorageProvider {
           try {
             await _refreshToken();
             await _saveToken(_token);
-            logger.i('Dropbox token refreshed successfully. Retrying original request.');
+            logger.i(
+                'Dropbox token refreshed successfully. Retrying original request.');
 
             final response = await _dio.request(
               e.requestOptions.path,
-              options: Options(method: e.requestOptions.method, headers: e.requestOptions.headers),
+              options: Options(
+                  method: e.requestOptions.method,
+                  headers: e.requestOptions.headers),
               data: e.requestOptions.data,
               queryParameters: e.requestOptions.queryParameters,
             );
             return handler.resolve(response);
           } catch (refreshError, stackTrace) {
-            logger.e('Failed to refresh Dropbox token. Logging out.', error: refreshError, stackTrace: stackTrace);
+            logger.e('Failed to refresh Dropbox token. Logging out.',
+                error: refreshError, stackTrace: stackTrace);
             await logout();
             return handler.reject(e);
           }
@@ -421,7 +446,8 @@ class DropboxProvider extends CloudStorageProvider {
 
   void _checkAuth() {
     if (!_isAuthenticated || _token == null) {
-      throw Exception('DropboxProvider: Not authenticated. Call connect() first.');
+      throw Exception(
+          'DropboxProvider: Not authenticated. Call connect() first.');
     }
   }
 
@@ -452,9 +478,12 @@ class DropboxProvider extends CloudStorageProvider {
   }
 
   Future<void> _fetchCurrentUserAccount() async {
-    if (_token == null) throw Exception('Cannot fetch user account without a token.');
+    if (_token == null) {
+      throw Exception('Cannot fetch user account without a token.');
+    }
     logger.d('Fetching current Dropbox user account.');
-    final response = await _dio.post('https://api.dropboxapi.com/2/users/get_current_account');
+    final response = await _dio
+        .post('https://api.dropboxapi.com/2/users/get_current_account');
     _account = DropboxAccount.fromJson(response.data);
     logger.d('Successfully fetched user: ${_account?.email}');
   }
@@ -474,7 +503,8 @@ class DropboxProvider extends CloudStorageProvider {
           logger.i('Received authorization code from redirect.');
           if (!codeCompleter.isCompleted) codeCompleter.complete(code);
         } else {
-          final error = link.queryParameters['error_description'] ?? 'Unknown error';
+          final error =
+              link.queryParameters['error_description'] ?? 'Unknown error';
           logger.e('Dropbox auth failed from redirect: $error');
           if (!codeCompleter.isCompleted) codeCompleter.complete(null);
         }
@@ -482,18 +512,21 @@ class DropboxProvider extends CloudStorageProvider {
     });
 
     logger.i('Launching Dropbox authorization URL: $authUrl');
-    if (!await launchUrl(uri, webViewConfiguration: const WebViewConfiguration())) {
+    if (!await launchUrl(uri,
+        webViewConfiguration: const WebViewConfiguration())) {
       linkSub.cancel();
-      final errorMsg = 'Could not launch Dropbox auth URL';
+      const errorMsg = 'Could not launch Dropbox auth URL';
       logger.e(errorMsg);
-      if(!codeCompleter.isCompleted) codeCompleter.completeError(errorMsg);
+      if (!codeCompleter.isCompleted) codeCompleter.completeError(errorMsg);
     }
 
     return codeCompleter.future;
   }
 
   Future<void> _completeConnection(String code) async {
-    if (_pkceCodeVerifier == null) throw Exception('PKCE code verifier is missing.');
+    if (_pkceCodeVerifier == null) {
+      throw Exception('PKCE code verifier is missing.');
+    }
     logger.d('Exchanging authorization code for a token.');
     final dioForToken = Dio();
     final response = await dioForToken.post(
@@ -553,7 +586,8 @@ class DropboxProvider extends CloudStorageProvider {
       path: data['path_display'],
       name: data['name'],
       size: isDir ? null : data['size'],
-      modifiedTime: isDir ? DateTime.now() : DateTime.parse(data['server_modified']),
+      modifiedTime:
+          isDir ? DateTime.now() : DateTime.parse(data['server_modified']),
       isDirectory: isDir,
       metadata: {'id': data['id'], if (!isDir) 'rev': data['rev']},
     );
@@ -568,19 +602,25 @@ class DropboxProvider extends CloudStorageProvider {
       'token_access_type': 'offline',
       'code_challenge_method': 'S256',
       'code_challenge': _generateCodeChallengeS256(_pkceCodeVerifier!),
-      'scope': 'account_info.read files.content.read files.content.write sharing.write',
+      'scope':
+          'account_info.read files.content.read files.content.write sharing.write',
     };
-    return Uri.https('www.dropbox.com', '/oauth2/authorize', queryParams).toString();
+    return Uri.https('www.dropbox.com', '/oauth2/authorize', queryParams)
+        .toString();
   }
 
   String _generateCodeVerifier() {
-    const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+    const charset =
+        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
     final random = Random.secure();
-    return List.generate(128, (_) => charset[random.nextInt(charset.length)]).join();
+    return List.generate(128, (_) => charset[random.nextInt(charset.length)])
+        .join();
   }
 
   String _generateCodeChallengeS256(String verifier) {
-    return base64Url.encode(sha256.convert(utf8.encode(verifier)).bytes).replaceAll('=', '');
+    return base64Url
+        .encode(sha256.convert(utf8.encode(verifier)).bytes)
+        .replaceAll('=', '');
   }
   //</editor-fold>
 
@@ -607,8 +647,11 @@ class DropboxProvider extends CloudStorageProvider {
         logger.i('Created sharable link: $url');
         return url == null ? null : Uri.parse(url);
       } on DioException catch (e) {
-        if (e.response?.data?['error_summary']?.contains('shared_link_already_exists') == true) {
-          logger.w('Share link already exists for $normalizedPath, fetching existing one.');
+        if (e.response?.data?['error_summary']
+                ?.contains('shared_link_already_exists') ==
+            true) {
+          logger.w(
+              'Share link already exists for $normalizedPath, fetching existing one.');
           final listResponse = await _dio.post(
             'https://api.dropboxapi.com/2/sharing/list_shared_links',
             data: jsonEncode({'path': normalizedPath, 'direct_only': true}),
@@ -628,14 +671,20 @@ class DropboxProvider extends CloudStorageProvider {
   }
 
   @override
-  Future<String> uploadFileByShareToken({required String localPath, required String shareToken, Map<String, dynamic>? metadata}) async {
-    logger.i("uploadFileById called, which for Dropbox is an alias for uploadFile with path: $shareToken");
+  Future<String> uploadFileByShareToken(
+      {required String localPath,
+      required String shareToken,
+      Map<String, dynamic>? metadata}) async {
+    logger.i(
+        "uploadFileById called, which for Dropbox is an alias for uploadFile with path: $shareToken");
     String remotePath = shareToken;
-    return uploadFile(localPath: localPath, remotePath: remotePath, metadata: metadata);
+    return uploadFile(
+        localPath: localPath, remotePath: remotePath, metadata: metadata);
   }
 
   @override
-  Future<String> downloadFileByShareToken({required String shareToken, required String localPath}) async {
+  Future<String> downloadFileByShareToken(
+      {required String shareToken, required String localPath}) async {
     // This method doesn't need _executeRequest as it downloads public links
     logger.d('Downloading shared Dropbox file: $shareToken to $localPath');
     final uri = Uri.parse(shareToken).replace(queryParameters: {'dl': '1'});
