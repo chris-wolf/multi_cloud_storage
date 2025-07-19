@@ -334,78 +334,6 @@ class OneDriveProvider extends CloudStorageProvider {
 
 
 
-  Future<_ResolvedShareInfo?> _resolveShareUrl(String shareUrl) async {
-    final accessToken = await _getAccessToken();
-    // The encoded URL string from the function above
-    final String encodedUrl = _encodeShareUrlForGraphAPI(shareUrl);
-
-// ❗️ Use this more robust method to build the URI
-    final resolveUri = Uri(
-      scheme: 'https',
-      host: 'graph.microsoft.com',
-      pathSegments: [
-        'v1.0',
-        'shares',
-        encodedUrl, // The entire encoded string is treated as one segment
-        'driveItem',
-      ],
-      queryParameters: {
-        // The '$' needs to be escaped with a backslash in the key
-        '\$select': 'id,parentReference,remoteItem',
-      },
-    );
-
-// This log will now show the full, correct URL before you send the request
-    logger.d("Making Graph API request to: ${resolveUri.toString()}");
-
-    final response = await http.get(resolveUri, headers: {
-      'Authorization': 'Bearer $accessToken',
-    });
-
-
-    if (response.statusCode != 200) {
-      logger.e(
-          'Failed to resolve share URL. Status: ${response.statusCode}, Body: ${response.body}');
-      return null;
-    }
-
-    final json = jsonDecode(response.body);
-
-    // Case 1: The item is a remote item (shared into the user's drive).
-    // The relevant IDs are nested within the 'remoteItem' object.
-    final remoteItem = json['remoteItem'];
-    if (remoteItem != null) {
-      final String? itemId = remoteItem['id'];
-      final String? driveId = remoteItem['parentReference']?['driveId'];
-      if (itemId != null && driveId != null) {
-        logger.i("Resolved a remote item from another drive. DriveID: $driveId, ItemID: $itemId");
-        return _ResolvedShareInfo(driveId: driveId, itemId: itemId);
-      }
-    }
-
-    // Case 2: The item is in the user's own drive.
-    // The IDs are at the top level or within the top-level 'parentReference'.
-    final String? itemId = json['id'];
-    final String? driveId = json['parentReference']?['driveId'];
-
-    if (itemId != null && driveId != null) {
-      logger.i("Resolved an item from the user's own drive. DriveID: $driveId, ItemID: $itemId");
-      return _ResolvedShareInfo(driveId: driveId, itemId: itemId);
-    }
-
-    // If neither case matches, we could not find the required IDs.
-    logger.e('Could not extract driveId and itemId from resolved share response. Body: ${response.body}');
-    return null;
-  }
-
-// Required imports:
-// import 'package:dio/dio.dart';
-// import 'package:cookie_jar/cookie_jar.dart';
-// import 'package:dio_cookie_manager/dio_cookie_manager.dart';
-// import 'dart:io';
-
-
-
   @override
   Future<String> getSharedFileById({
     required String fileId,
@@ -459,7 +387,7 @@ class OneDriveProvider extends CloudStorageProvider {
       logger.i("Downloading with Dio using WebView cookies and Referer.");
 
       // This request will now have User-Agent, Referer, AND Cookies.
-     final result =  await dio.download(
+      final result =  await dio.download(
         finalDownloadUrl,
         localPath,
         options: Options(
@@ -492,13 +420,14 @@ class OneDriveProvider extends CloudStorageProvider {
     final String encodedUrl = _encodeShareUrlForGraphAPI(shareUrl);
     // Request remoteItem to handle cross-drive scenarios
     final resolveUri = Uri.parse(
-        'https://graph.microsoft.com/v1.0/shares/$encodedUrl/driveItem?\$select=id,parentReference,remoteItem');
+        'https://graph.microsoft.com/v1.0/shares/$encodedUrl/driveItem?\$select=id,driveId,parentReference,remoteItem');
 
     final response = await http.get(resolveUri, headers: {
-      'Authorization': 'Bearer $accessToken', // Replace with actual token retrieval
+      'Authorization': 'Bearer $accessToken',
+      'Prefer': 'redeemSharingLink',
     });
 
-    if (response.statusCode!= 200) {
+    if (response.statusCode != 200) {
       logger.e(
           'Failed to resolve share URL. Status: ${response.statusCode}, Body: ${response.body}');
       return null;
@@ -506,9 +435,9 @@ class OneDriveProvider extends CloudStorageProvider {
 
     final json = jsonDecode(response.body);
 
-    // Check for remoteItem first, as it indicates a shared-in file.
+    // Check for remoteItem first, as it indicates a shared-in file from another drive.
     final remoteItem = json['remoteItem'];
-    if (remoteItem!= null && remoteItem['id']!= null && remoteItem?['driveId']!= null) {
+    if (remoteItem != null && remoteItem['id'] != null && remoteItem['driveId'] != null) {
       logger.i("Resolved a remote item from another drive.");
       return _ResolvedShareInfo(
         driveId: remoteItem['driveId'],
@@ -516,12 +445,14 @@ class OneDriveProvider extends CloudStorageProvider {
       );
     }
 
-    // Fallback to top-level properties for items in the user's own drive.
+    // Fallback for items in the user's own drive.
     final String? itemId = json['id'];
-    final String? driveId = json?['driveId'];
+    // CORRECTED LINE: Access driveId from within parentReference.
+    final String? driveId = json['parentReference']?['driveId'];
 
     if (itemId == null || driveId == null) {
-      logger.e('Could not extract driveId and itemId from resolved share response.');
+      logger.e(
+          'Could not extract driveId and itemId from resolved share response. Body: ${response.body}');
       return null;
     }
 
@@ -537,7 +468,7 @@ class OneDriveProvider extends CloudStorageProvider {
   }) {
     return _executeRequest(
           () async {
-            final accessToken = await _getAccessToken();
+        final accessToken = await _getAccessToken();
         // Step 1: Resolve the sharing URL to get the correct, stable identifiers.
         // This version of resolve handles the remoteItem facet.
         final resolvedInfo = await _resolveShareUrlForUpload(fileId);
