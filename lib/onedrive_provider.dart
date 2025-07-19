@@ -35,6 +35,7 @@ class OneDriveProvider extends CloudStorageProvider {
     required String clientId,
     required String redirectUri,
     required BuildContext context,
+    String? scopes
   }) async {
     if (clientId.trim().isEmpty) {
       throw ArgumentError(
@@ -45,13 +46,14 @@ class OneDriveProvider extends CloudStorageProvider {
       'https://login.microsoftonline.com/common/oauth2/nativeclient'; //fallback: use native redirect
     }
 
+
     final provider = OneDriveProvider._create(
         clientId: clientId, redirectUri: redirectUri, context: context);
 
     provider.client = OneDrive(
       clientID: clientId,
       redirectURL: redirectUri,
-      scopes: "${OneDrive.permissionFilesReadWriteAll} ${OneDrive.permissionFilesReadWriteAppFolder} offline_access User.Read Sites.ReadWrite.All",
+      scopes: scopes ?? "${MultiCloudStorage.cloudAccess == CloudAccessType.appStorage ? OneDrive.permissionFilesReadWriteAppFolder : OneDrive.permissionFilesReadWriteAll} offline_access User.Read Sites.ReadWrite.All",
     );
 
     // 1. First, try to connect silently by checking for an existing token

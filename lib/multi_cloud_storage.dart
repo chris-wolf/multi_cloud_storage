@@ -29,9 +29,10 @@ class MultiCloudStorage {
     required String clientId,
     required String redirectUri,
     required BuildContext context,
+    String? scopes,
   }) =>
       OneDriveProvider.connect(
-          clientId: clientId, redirectUri: redirectUri, context: context);
+          clientId: clientId, redirectUri: redirectUri, context: context, scopes: scopes);
 }
 
 enum CloudAccessType { appStorage, fullAccess }
