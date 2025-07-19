@@ -141,9 +141,9 @@ class ICloudStorageProvider extends CloudStorageProvider {
   //----------------------------------------------------------------------------
 
   @override
-  Future<String> uploadFileById({
+  Future<String> uploadFileByShareToken({
     required String localPath,
-    required String fileId, // For iCloud, the 'fileId' is the 'remotePath'.
+    required String shareToken,
     Map<String, dynamic>? metadata,
   }) async {
    throw UnsupportedError('iCloud doesn\'t allow sharing of files since each app has its own container');
@@ -177,20 +177,20 @@ class ICloudStorageProvider extends CloudStorageProvider {
   }
 
   @override
-  Future<Uri?> generateSharableLink(String path) {
+  Future<Uri?> generateShareLink(String path) {
     // The package does not support creating sharable links.
     throw UnimplementedError('iCloudProvider: Generating sharable links is not supported.');
   }
 
   @override
-  Future<String?> extractFileIdFromSharableLink(Uri shareLink) {
+  Future<String?> getShareTokenFromShareLink(Uri shareLink) {
     // The package does not support sharing.
     throw UnimplementedError('iCloudProvider: Sharing functionality is not supported.');
   }
 
   @override
-  Future<String> getSharedFileById({
-    required String fileId,
+  Future<String> downloadFileByShareToken({
+    required String shareToken,
     required String localPath
   }) {
     // The package does not support sharing.

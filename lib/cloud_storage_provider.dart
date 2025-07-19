@@ -9,12 +9,6 @@ abstract class CloudStorageProvider {
     Map<String, dynamic>? metadata,
   });
 
-  /// Uploads a file to the cloud storage.
-  Future<String> uploadFileById({
-    required String localPath,
-    required String fileId,
-    Map<String, dynamic>? metadata,
-  });
 
   /// Downloads a file from the cloud storage.
   Future<String> downloadFile({
@@ -43,13 +37,21 @@ abstract class CloudStorageProvider {
   /// Checks if the suer token is still expired.
   Future<bool> tokenExpired();
 
-  Future<Uri?> generateSharableLink(String path);
+  Future<Uri?> generateShareLink(String path);
 
-  Future<String?> extractFileIdFromSharableLink(Uri shareLink);
+  Future<String?> getShareTokenFromShareLink(Uri shareLink);
 
-  Future<String> getSharedFileById({
-    required String fileId,
+  Future<String> downloadFileByShareToken({
+    required String shareToken,
     required String localPath
+  });
+
+
+  /// Uploads a file to the cloud storage.
+  Future<String> uploadFileByShareToken({
+    required String localPath,
+    required String shareToken,
+    Map<String, dynamic>? metadata,
   });
 }
 

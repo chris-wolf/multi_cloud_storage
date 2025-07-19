@@ -208,7 +208,7 @@ class OneDriveProvider extends CloudStorageProvider {
   }
 
   @override
-  Future<Uri?> generateSharableLink(String path) {
+  Future<Uri?> generateShareLink(String path) {
     return _executeRequest(
           () async {
         final accessToken = await _getAccessToken();
@@ -315,8 +315,8 @@ class OneDriveProvider extends CloudStorageProvider {
   }
 
   @override
-  Future<String?> extractFileIdFromSharableLink(Uri shareLink) async {
-    return shareLink.toString(); // no real file id so just return the shared url!
+  Future<String?> getShareTokenFromShareLink(Uri shareLink) async {
+    return shareLink.toString(); // use full url as shareToken
   }
 
   String encodeShareUrl(Uri url) {
@@ -330,7 +330,7 @@ class OneDriveProvider extends CloudStorageProvider {
     return _executeRequest(
           () async {
         final accessToken = await _getAccessToken();
-        if (accessToken == null || accessToken.isEmpty) return null;
+        if (accessToken.isEmpty) return null;
 
         final response = await http.get(
           Uri.parse('https://graph.microsoft.com/v1.0/me'),
@@ -348,18 +348,16 @@ class OneDriveProvider extends CloudStorageProvider {
     );
   }
 
-
-
   @override
-  Future<String> getSharedFileById({
-    required String fileId,
+  Future<String> downloadFileByShareToken({
+    required String shareToken,
     required String localPath,
   }) async {
     final completer = Completer<String>();
     late HeadlessInAppWebView headlessWebView;
 
     final initialUrl =
-    Uri.parse(fileId).replace(queryParameters: {'download': '1'});
+    Uri.parse(shareToken).replace(queryParameters: {'download': '1'});
 
     logger.i("Starting headless WebView to resolve download for: $initialUrl");
 
@@ -415,7 +413,7 @@ class OneDriveProvider extends CloudStorageProvider {
           headers: {
             'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-            'Referer': fileId,
+            'Referer': shareToken,
           },
         ),
       );
@@ -482,9 +480,9 @@ class OneDriveProvider extends CloudStorageProvider {
   }
 
   @override
-  Future<String> uploadFileById({
+  Future<String> uploadFileByShareToken({
     required String localPath,
-    required String fileId, // fileId = shareUrl
+    required String shareToken,
     Map<String, dynamic>? metadata,
   }) {
     return _executeRequest(
@@ -492,7 +490,7 @@ class OneDriveProvider extends CloudStorageProvider {
         final accessToken = await _getAccessToken();
         // Step 1: Resolve the sharing URL to get the correct, stable identifiers.
         // This version of resolve handles the remoteItem facet.
-        final resolvedInfo = await _resolveShareUrlForUpload(fileId);
+        final resolvedInfo = await _resolveShareUrlForUpload(shareToken);
         if (resolvedInfo == null) {
           throw Exception('Could not resolve the provided sharing URL for upload.');
         }
@@ -517,13 +515,13 @@ class OneDriveProvider extends CloudStorageProvider {
         if (uploadResponse.statusCode >= 200 && uploadResponse.statusCode < 300) {
           logger.i('Successfully uploaded file to shared URL location.');
           // Return the original shareUrl to signify success on the target resource.
-          return fileId;
+          return shareToken;
         } else {
           throw Exception(
               'Failed to upload file content. Status: ${uploadResponse.statusCode}, Body: ${uploadResponse.body}');
         }
       },
-      operation: 'uploadToSharedUrl: $fileId',
+      operation: 'uploadToSharedUrl: $shareToken',
     );
   }
 

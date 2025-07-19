@@ -200,9 +200,9 @@ class GoogleDriveProvider extends CloudStorageProvider {
       final existingFile = await _getFileByPath(remotePath);
 
       if (existingFile != null && existingFile.id != null) {
-        return uploadFileById(
+        return uploadFileByShareToken(
           localPath: localPath,
-          fileId: existingFile.id!,
+          shareToken: existingFile.id!,
           metadata: metadata,
         );
       } else {
@@ -225,9 +225,9 @@ class GoogleDriveProvider extends CloudStorageProvider {
   }
 
   @override
-  Future<String> uploadFileById({
+  Future<String> uploadFileByShareToken({
     required String localPath,
-    required String fileId,
+    required String shareToken,
     Map<String, dynamic>? metadata,
   }) {
     return _executeRequest(() async {
@@ -236,7 +236,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
       final media = drive.Media(file.openRead(), await file.length());
 
       final updatedFile = await driveApi.files
-          .update(driveFile, fileId, uploadMedia: media, $fields: 'id');
+          .update(driveFile, shareToken, uploadMedia: media, $fields: 'id');
       return updatedFile.id!;
     });
   }
@@ -496,8 +496,8 @@ class GoogleDriveProvider extends CloudStorageProvider {
   }
 
   @override
-  Future<String> getSharedFileById({
-    required String fileId,
+  Future<String> downloadFileByShareToken({
+    required String shareToken,
     required String localPath
   }) {
     return _executeRequest(() async {
@@ -505,7 +505,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
       final sink = output.openWrite();
       try {
         final media = await driveApi.files
-            .get(fileId, downloadOptions: drive.DownloadOptions.fullMedia)
+            .get(shareToken, downloadOptions: drive.DownloadOptions.fullMedia)
         as drive.Media;
         await media.stream.pipe(sink);
       } finally {
@@ -516,14 +516,14 @@ class GoogleDriveProvider extends CloudStorageProvider {
   }
 
   @override
-  Future<String?> extractFileIdFromSharableLink(Uri shareLink) async {
+  Future<String?> getShareTokenFromShareLink(Uri shareLink) async {
     final regex = RegExp(r'd/([a-zA-Z0-9_-]+)');
     final match = regex.firstMatch(shareLink.toString());
     return match?.group(1);
   }
 
   @override
-  Future<Uri?> generateSharableLink(String path) {
+  Future<Uri?> generateShareLink(String path) {
     return _executeRequest(() async {
       final drive.File? file = await _getFileByPath(path);
       if (file == null || file.id == null) {

@@ -590,7 +590,7 @@ class DropboxProvider extends CloudStorageProvider {
   Future<bool> tokenExpired() async => _token?.isExpired ?? true;
 
   @override
-  Future<Uri?> generateSharableLink(String path) {
+  Future<Uri?> generateShareLink(String path) {
     return _executeRequest(() async {
       final normalizedPath = _normalizePath(path);
       logger.d('Generating sharable link for Dropbox path: $normalizedPath');
@@ -628,20 +628,17 @@ class DropboxProvider extends CloudStorageProvider {
   }
 
   @override
-  Future<String> uploadFileById({required String localPath, required String fileId, Map<String, dynamic>? metadata}) async {
-    // Dropbox API primarily uses paths, not IDs, for uploads.
-    // If 'fileId' is a path, we can just call the standard upload.
-    // This assumes the fileId is the full remote path to the file.
-    logger.i("uploadFileById called, which for Dropbox is an alias for uploadFile with path: $fileId");
-    String remotePath = fileId;
+  Future<String> uploadFileByShareToken({required String localPath, required String shareToken, Map<String, dynamic>? metadata}) async {
+    logger.i("uploadFileById called, which for Dropbox is an alias for uploadFile with path: $shareToken");
+    String remotePath = shareToken;
     return uploadFile(localPath: localPath, remotePath: remotePath, metadata: metadata);
   }
 
   @override
-  Future<String> getSharedFileById({required String fileId, required String localPath}) async {
+  Future<String> downloadFileByShareToken({required String shareToken, required String localPath}) async {
     // This method doesn't need _executeRequest as it downloads public links
-    logger.d('Downloading shared Dropbox file: $fileId to $localPath');
-    final uri = Uri.parse(fileId).replace(queryParameters: {'dl': '1'});
+    logger.d('Downloading shared Dropbox file: $shareToken to $localPath');
+    final uri = Uri.parse(shareToken).replace(queryParameters: {'dl': '1'});
 
     // Use a separate Dio instance for downloading public links (no auth needed)
     final publicDio = Dio();
@@ -664,7 +661,7 @@ class DropboxProvider extends CloudStorageProvider {
   }
 
   @override
-  Future<String?> extractFileIdFromSharableLink(Uri shareLink) async {
+  Future<String?> getShareTokenFromShareLink(Uri shareLink) async {
     // For Dropbox, the "ID" is the URL itself. We just validate it.
     final url = shareLink.toString();
     if (url.contains('dropbox.com/scl/')) {
