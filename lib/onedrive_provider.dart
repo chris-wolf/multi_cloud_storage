@@ -251,18 +251,30 @@ class OneDriveProvider extends CloudStorageProvider {
   @override
   Future<bool> logout() async {
     logger.i("Logging out from OneDrive...");
+
+    // Get the InAppWebView CookieManager instance
+    final cookieManager = CookieManager.instance();
+
     if (_isAuthenticated) {
       try {
+        // 1. Disconnect the client (clears local tokens)
         await client.disconnect();
         _isAuthenticated = false;
-        logger.i("OneDrive logout successful.");
+
+        // 2. Clear all webview cookies to force a fresh login prompt next time
+        await cookieManager.deleteAllCookies();
+
+        logger.i("OneDrive logout successful and web cookies cleared.");
         return true;
       } catch (error, stackTrace) {
         logger.e("Error during OneDrive logout.", error: error, stackTrace: stackTrace);
         return false;
       }
     }
-    logger.d("Already logged out from OneDrive.");
+
+    // Also clear cookies even if not authenticated, just to be safe
+    await cookieManager.deleteAllCookies();
+    logger.d("Already logged out from OneDrive, ensuring cookies are cleared.");
     return false;
   }
 
