@@ -18,6 +18,8 @@ import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio_cookie_manager/dio_cookie_manager.dart' hide CookieManager;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
+import 'not_found_exception.dart';
+
 class OneDriveProvider extends CloudStorageProvider {
   late OneDrive client;
   bool _isAuthenticated = false;
@@ -68,7 +70,6 @@ class OneDriveProvider extends CloudStorageProvider {
     // 2. If not connected, proceed with the interactive login
     logger.i("OneDriveProvider: Not connected, attempting interactive login...");
     final success = await provider.client.connect(context);
-
     if (success == false) {
       logger.i("OneDriveProvider: Interactive login failed or was cancelled.");
       return null; // User cancelled or login failed
@@ -329,18 +330,19 @@ class OneDriveProvider extends CloudStorageProvider {
     return _executeRequest(
           () async {
         final accessToken = await _getAccessToken();
-
         if (accessToken == null || accessToken.isEmpty) return null;
 
         final response = await http.get(
           Uri.parse('https://graph.microsoft.com/v1.0/me'),
           headers: {'Authorization': 'Bearer $accessToken'},
         );
-
         if (response.statusCode != 200) return null;
-
         final json = jsonDecode(response.body);
-        return json['displayName'] as String?;
+        String? name =  json['displayName'] as String?;
+        if (name?.trim().isEmpty ?? true) {
+          name = json['userPrincipalName'] as String?;
+        }
+        return name;
       },
       operation: 'loggedInUserDisplayName',
     );
@@ -381,8 +383,13 @@ class OneDriveProvider extends CloudStorageProvider {
             final pageBody = await controller.getHtml() ?? "";
             if (pageBody.toLowerCase().contains("error") ||
                 pageBody.toLowerCase().contains("denied")) {
-              completer.completeError(
-                  Exception("WebView navigation ended on an error page."));
+              if(pageBody.contains('-1007')) {
+                completer.completeError(
+                    NotFoundException("WebView navigation ended on an error page."));
+              } else {
+                completer.completeError(
+                    Exception("WebView navigation ended on an error page."));
+              }
             }
           }
         });

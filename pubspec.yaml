@@ -13,7 +13,8 @@ dependencies:
   googleapis: ^14.0.0
   extension_google_sign_in_as_googleapis_auth: ^2.0.13
   google_sign_in: ^6.3.0
-  flutter_onedrive: ^1.8.0
+  flutter_onedrive:
+    path: ../flutter_onedrive
   path: ^1.9.1
   http: ^1.4.0
   flutter_web_auth_2: ^4.1.0
