@@ -711,13 +711,6 @@ class DropboxProvider extends CloudStorageProvider {
 
   @override
   Future<String?> getShareTokenFromShareLink(Uri shareLink) async {
-    // For Dropbox, the "ID" is the URL itself. We just validate it.
-    final url = shareLink.toString();
-    if (url.contains('dropbox.com/scl/')) {
-      logger.d("Extracted valid Dropbox share link: $url");
-      return url;
-    }
-    logger.w("Link is not a valid Dropbox shared folder/file link: $shareLink");
-    return null;
+    return null; // unsupported
   }
 }

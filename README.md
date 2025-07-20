@@ -16,13 +16,34 @@ A Flutter plugin that provides a unified API for interacting with multiple cloud
 
 ## Supported Platforms
 
-| Service       | Android | iOS | Mac  | Windows | Linux |
-| ------------- |:-------:|:---:|:----:|:-------:|:-----:|
-| OneDrive      |    ✅    | ⚠️  | ⚠️   |   ⚠️    |  ❌   |
-| Google Drive  |    ✅    | ✅  | ⚠️   |   ❌    |  ❌   |
-| Dropbox       |    ✅    | ✅  | ⚠️   |   ⚠️    |  ⚠️   |
+| Service | App Folder | Full Access | Android | iOS | Mac | Windows | Linux |
+| ------------- |:----------:|:-----------:|:-------:|:---:|:----:|:-------:|:-----:|
+| OneDrive | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ❌ |
+| Google Drive | ✅ | ✅ | ✅ | ✅ | ⚠️ | ❌ | ❌ |
+| Dropbox | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ |
+| iCloud | ✅ | ❌ | ❌ | ✅ | ⚠️ | ⚠️ | ❌ |
 
 ⚠️ = Still untested, but should work.
+
+
+
+
+## Supported Functions
+| Methods                         | OneDrive | Google Drive | Dropbox | iCloud |
+|---------------------------------|----------|--------------|---------|--------|
+| listFiles                      | ✅       | ✅           | ✅      | ✅     |
+| uploadFile                     | ✅       | ✅           | ✅      | ✅     |
+| downloadFile                   | ✅       | ✅           | ✅      | ✅     |
+| deleteFile                     | ✅       | ✅           | ✅      | ✅     |
+| createDirectory                | ✅       | ✅           | ✅      | ❌     |
+| getFileMetadata                | ❌       | ✅           | ✅      | ✅     |
+| logout                         | ✅       | ✅           | ✅      | ✅     |
+| tokenExpired                   | ✅       | ✅           | ✅      | ✅     |
+| loggedInUserDisplayName        | ✅       | ✅           | ✅      | ❌     |
+| generateShareLink              | ✅       | ✅           | ✅      | ❌     |
+| getShareTokenFromShareLink    | ✅       | ✅           | ❌      | ❌     |
+| downloadFileByShareToken      | ✅       | ✅           | ❌      | ❌     |
+| uploadFileByShareToken        | ✅       | ✅           | ❌      | ❌     |
 
 ---
 
@@ -92,6 +113,9 @@ flutter pub get
       - Files.ReadWrite
       - Files.Read.All
       - Files.ReadWrite.All
+      - User.Read
+      - Sites.ReadWrite.All
+    - Click on `Grant admin consent for Default Directory` to enable these permissions.
 
 
 

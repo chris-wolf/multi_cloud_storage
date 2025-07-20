@@ -1,11 +1,14 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:icloud_storage_sync/icloud_storage_sync.dart';
+import 'package:icloud_storage_sync/models/exceptions.dart';
 import 'package:icloud_storage_sync/models/icloud_file.dart';
 import 'package:path/path.dart' as p;
 
 import 'cloud_storage_provider.dart';
+import 'not_found_exception.dart';
 
 /// An implementation of [CloudStorageProvider] for Apple's iCloud Drive.
 ///
@@ -52,7 +55,7 @@ class ICloudStorageProvider extends CloudStorageProvider {
     await _icloudSync.upload(
       containerId: _containerId,
       filePath: localPath,
-      destinationRelativePath: remotePath,
+      destinationRelativePath: _sanitizePath(remotePath),
     );
     // For iCloud, the path acts as the identifier.
     return remotePath;
@@ -63,12 +66,25 @@ class ICloudStorageProvider extends CloudStorageProvider {
     required String remotePath,
     required String localPath,
   }) async {
-    await _icloudSync.download(
-      containerId: _containerId,
-      relativePath: remotePath,
-      destinationFilePath: localPath,
-    );
-    return localPath;
+    try {
+      await _icloudSync.download(
+        containerId: _containerId,
+        relativePath: _sanitizePath(remotePath),
+        destinationFilePath: localPath,
+      );
+      return localPath;
+    } on PlatformException catch (e) {
+      // Check for the specific "File Not Found" error from the native iOS/macOS side.
+      // NSCocoaErrorDomain code 4 is the standard file-not-found error.
+      if (e.toString().contains('NSCocoaErrorDomain Code=4')) {
+        // Convert the platform-specific error into our abstract NotFoundException
+        throw NotFoundException(
+          'File not found in iCloud at path: $remotePath. Original error: ${e.toString()}',
+        );
+      }
+      // For any other platform exceptions, rethrow them as they are unexpected.
+      rethrow;
+    }
   }
 
   @override
@@ -165,7 +181,7 @@ class ICloudStorageProvider extends CloudStorageProvider {
   @override
   Future<bool> logout() async {
     _instance = null;
-    return true; // nothing todo
+    return true;
   }
 
   @override
@@ -190,10 +206,16 @@ class ICloudStorageProvider extends CloudStorageProvider {
   }
 
   @override
-  Future<String?> getShareTokenFromShareLink(Uri shareLink) {
-    // The package does not support sharing.
-    throw UnimplementedError(
-        'iCloudProvider: Sharing functionality is not supported.');
+  Future<String?> getShareTokenFromShareLink(Uri shareLink) async {
+    return null;  // The package does not support sharing.
+  }
+
+  /// Removes a leading slash from a path, as the iCloud package requires it.
+  String _sanitizePath(String path) {
+    if (path.startsWith('/')) {
+      return path.substring(1);
+    }
+    return path;
   }
 
   @override
