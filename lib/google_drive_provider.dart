@@ -3,10 +3,10 @@ import 'dart:io';
 import 'package:extension_google_sign_in_as_googleapis_auth/extension_google_sign_in_as_googleapis_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
+import 'package:googleapis_auth/googleapis_auth.dart';
 import 'package:http/retry.dart';
 import 'package:logger/logger.dart';
 import 'package:path/path.dart';
-import 'package:googleapis_auth/googleapis_auth.dart';
 
 // Assuming your global logger is accessible via main.dart
 import 'cloud_storage_provider.dart';
@@ -40,11 +40,6 @@ class GoogleDriveProvider extends CloudStorageProvider {
 
   static GoogleDriveProvider? get instance => _instance;
 
-  @override
-  Future<String?> loggedInUserDisplayName() async {
-    return _googleSignIn?.currentUser?.displayName;
-  }
-
   /// Connects to Google Drive, authenticating the user.
   ///
   /// This method handles the Google Sign-In flow. It will attempt to sign in
@@ -61,13 +56,12 @@ class GoogleDriveProvider extends CloudStorageProvider {
     _googleSignIn ??= GoogleSignIn(
       scopes: [
         MultiCloudStorage.cloudAccess == CloudAccessType.appStorage
-            ? drive.DriveApi.driveAppdataScope // Access to the app-specific folder.
+            ? drive.DriveApi
+                .driveAppdataScope // Access to the app-specific folder.
             : drive.DriveApi.driveScope, // Full access to user's Drive.
       ],
     );
-
     GoogleSignInAccount? account;
-
     try {
       // Attempt silent sign-in first to avoid unnecessary user interaction.
       if (!forceInteractive) {
@@ -75,50 +69,41 @@ class GoogleDriveProvider extends CloudStorageProvider {
       }
       // If silent sign-in fails or is skipped, start the interactive sign-in flow.
       account ??= await _googleSignIn!.signIn();
-
       if (account == null) {
         logger.i('User cancelled Google Sign-In process.');
         return null;
       }
-
       // Ensure the user has granted the required permissions.
       final bool hasPermissions =
-      await _googleSignIn!.requestScopes(_googleSignIn!.scopes);
+          await _googleSignIn!.requestScopes(_googleSignIn!.scopes);
       if (!hasPermissions) {
         logger.w('User did not grant necessary Google Drive permissions.');
         await signOut();
         return null;
       }
-
       // Get the authenticated HTTP client.
       final client = await _googleSignIn!.authenticatedClient();
-
       if (client == null) {
         logger.e(
             'Failed to get authenticated Google client after permissions were granted.');
         await signOut();
         return null;
       }
-
       // Wrap the client in a RetryClient to handle transient network errors (5xx).
       final retryClient = RetryClient(
         client,
         retries: 3,
-        when: (response) =>
-            {500, 502, 503, 504}.contains(response.statusCode),
+        when: (response) => {500, 502, 503, 504}.contains(response.statusCode),
         onRetry: (request, response, retryCount) =>
             logger.d('Retrying request to ${request.url} (Retry #$retryCount)'),
       );
-
       // Create or update the singleton instance with the authenticated client.
       final provider = _instance ?? GoogleDriveProvider._create();
       provider.driveApi = drive.DriveApi(retryClient);
       provider._isAuthenticated = true;
       _instance = provider;
-
       logger.i(
           'Google Drive user signed in: ID=${account.id}, Email=${account.email}');
-
       return _instance;
     } catch (error, stackTrace) {
       logger.e(
@@ -131,145 +116,62 @@ class GoogleDriveProvider extends CloudStorageProvider {
     }
   }
 
-  /// Signs the user out of Google and disconnects the app.
-  static Future<void> signOut() async {
-    try {
-      await _googleSignIn?.disconnect();
-      await _googleSignIn?.signOut();
-    } catch (error, stackTrace) {
-      logger.e(
-        'Failed to sign out or disconnect from Google.',
-        error: error,
-        stackTrace: stackTrace,
-      );
-    } finally {
-      // Clear all state regardless of success or failure.
-      _googleSignIn = null;
-      if (_instance != null) {
-        _instance!._isAuthenticated = false;
-        _instance = null;
-      }
-      logger.i('User signed out from Google Drive.');
-    }
-  }
-
-  /// Throws an exception if the provider is not authenticated.
-  void _checkAuth() {
-    if (!_isAuthenticated || _instance == null) {
-      throw Exception(
-          'GoogleDriveProvider: Not authenticated. Call connect() first.');
-    }
-  }
-
-  /// A helper to handle auth errors by reconnecting and retrying the request.
-  ///
-  /// This is called when a 401/403 error occurs, indicating an expired token.
-  /// It attempts a silent reconnect to refresh the token and then retries the
-  /// original function `request`.
-  Future<T> _handleAuthErrorAndRetry<T>(
-      Future<T> Function() request, Object error, StackTrace stackTrace) async {
-    logger.w('Authentication error occurred. Attempting to reconnect...',
-        error: error, stackTrace: stackTrace);
-    _isAuthenticated = false;
-
-    // Silently try to reconnect to refresh the auth token.
-    final reconnectedProvider = await GoogleDriveProvider.connect();
-
-    if (reconnectedProvider != null && reconnectedProvider._isAuthenticated) {
-      logger.i('Successfully reconnected. Retrying the original request.');
-      // Retry the original request closure.
-      return await request();
-    } else {
-      logger
-          .e('Failed to reconnect after auth error. Throwing original error.');
-      // If reconnection fails, rethrow the original error to the caller.
-      throw error;
-    }
-  }
-
-  /// A wrapper for all API requests to centralize authentication checks and error handling.
-  ///
-  /// Executes the given `request` function. If an authentication error (401/403)
-  /// occurs, it triggers the automatic reconnection and retry logic.
-  Future<T> _executeRequest<T>(Future<T> Function() request) async {
-    _checkAuth();
-    try {
-      return await request();
-    } on drive.DetailedApiRequestError catch (e, stackTrace) {
-      // If the error is an auth token issue, try to recover.
-      if (e.status == 401 || e.status == 403) {
-        return _handleAuthErrorAndRetry(request, e, stackTrace);
-      }
-      // For other API errors, rethrow them.
-      rethrow;
-    } on AccessDeniedException catch (e, stackTrace) {
-      // Also handle auth errors from the underlying auth library.
-      return _handleAuthErrorAndRetry(request, e, stackTrace);
-    }
-  }
-
-  /// Gets the root folder ID ('appDataFolder' or 'root') based on the access type.
-  Future<String> _getRootFolderId() async {
-    return MultiCloudStorage.cloudAccess == CloudAccessType.appStorage
-        ? 'appDataFolder'
-        : 'root';
-  }
-
-  /// Uploads a file from a [localPath] to a [remotePath].
+  /// Uploads a file from a [localPath] to a [remotePath] in the cloud.
   @override
-  Future<String> uploadFile({
-    required String localPath,
-    required String remotePath,
-    Map<String, dynamic>? metadata,
-  }) {
+  Future<List<CloudFile>> listFiles(
+      {String path = '', bool recursive = false}) {
     return _executeRequest(() async {
-      // Check if a file already exists at the remote path.
-      final existingFile = await _getFileByPath(remotePath);
-
-      if (existingFile != null && existingFile.id != null) {
-        // If it exists, update it using its file ID.
-        return uploadFileByShareToken(
-          localPath: localPath,
-          shareToken: existingFile.id!,
-          metadata: metadata,
+      final folder = await _getFolderByPath(path);
+      if (folder == null || folder.id == null) {
+        return []; // Return empty list if path does not exist.
+      }
+      final List<CloudFile> cloudFiles = [];
+      String? pageToken;
+      // Loop to handle paginated results from the Drive API.
+      do {
+        final fileList = await driveApi.files.list(
+          spaces: MultiCloudStorage.cloudAccess == CloudAccessType.appStorage
+              ? 'appDataFolder'
+              : 'drive',
+          q: "'${folder.id}' in parents and trashed = false",
+          $fields:
+              'nextPageToken, files(id, name, size, modifiedTime, mimeType, parents)',
+          pageToken: pageToken,
         );
-      } else {
-        // If it doesn't exist, create it.
-        final file = File(localPath);
-        final fileName = basename(remotePath);
-        final remoteDir = dirname(remotePath) == '.' ? '' : dirname(remotePath);
-        // Ensure the parent directory exists.
-        final folder = await _getOrCreateFolder(remoteDir);
-
-        final driveFile = drive.File()
-          ..name = fileName
-          ..parents = [folder.id!];
-
-        final media = drive.Media(file.openRead(), await file.length());
-
-        final uploadedFile = await driveApi.files
-            .create(driveFile, uploadMedia: media, $fields: 'id, name');
-        return uploadedFile.id!;
+        if (fileList.files != null) {
+          for (final file in fileList.files!) {
+            String currentItemPath = join(path, file.name ?? '');
+            if (path == '/' || path.isEmpty) currentItemPath = file.name ?? '';
+            // Convert Google Drive file object to a generic CloudFile.
+            cloudFiles.add(CloudFile(
+              path: currentItemPath,
+              name: file.name ?? 'Unnamed',
+              size: file.size == null ? null : int.tryParse(file.size!),
+              modifiedTime: file.modifiedTime ?? DateTime.now(),
+              isDirectory:
+                  file.mimeType == 'application/vnd.google-apps.folder',
+              metadata: {
+                'id': file.id,
+                'mimeType': file.mimeType,
+                'parents': file.parents
+              },
+            ));
+          }
+        }
+        pageToken = fileList.nextPageToken;
+      } while (pageToken != null);
+      // If recursive is true, fetch files from all subdirectories.
+      if (recursive) {
+        final List<CloudFile> subFolderFiles = [];
+        for (final cf in cloudFiles) {
+          if (cf.isDirectory) {
+            subFolderFiles
+                .addAll(await listFiles(path: cf.path, recursive: true));
+          }
+        }
+        cloudFiles.addAll(subFolderFiles);
       }
-    });
-  }
-
-  /// Uploads a file from [localPath] using a [shareToken].
-  @override
-  Future<String> uploadFileByShareToken({
-    required String localPath,
-    required String shareToken,
-    Map<String, dynamic>? metadata,
-  }) {
-    return _executeRequest(() async {
-      final file = File(localPath);
-      final driveFile = drive.File(); // Empty file metadata for update
-      final media = drive.Media(file.openRead(), await file.length());
-
-      // Use the 'update' method with the file ID (shareToken) to overwrite content.
-      final updatedFile = await driveApi.files
-          .update(driveFile, shareToken, uploadMedia: media, $fields: 'id');
-      return updatedFile.id!;
+      return cloudFiles;
     });
   }
 
@@ -285,10 +187,8 @@ class GoogleDriveProvider extends CloudStorageProvider {
       if (file == null || file.id == null) {
         throw Exception('GoogleDriveProvider: File not found at $remotePath');
       }
-
       final output = File(localPath);
       final sink = output.openWrite();
-
       try {
         // Download the file content by its ID.
         final media = await driveApi.files.get(file.id!,
@@ -307,65 +207,38 @@ class GoogleDriveProvider extends CloudStorageProvider {
     });
   }
 
-  /// Uploads a file from a [localPath] to a [remotePath] in the cloud.
+  /// Uploads a file from a [localPath] to a [remotePath].
   @override
-  Future<List<CloudFile>> listFiles(
-      {String path = '', bool recursive = false}) {
+  Future<String> uploadFile({
+    required String localPath,
+    required String remotePath,
+    Map<String, dynamic>? metadata,
+  }) {
     return _executeRequest(() async {
-      final folder = await _getFolderByPath(path);
-      if (folder == null || folder.id == null) {
-        return []; // Return empty list if path does not exist.
-      }
-
-      final List<CloudFile> cloudFiles = [];
-      String? pageToken;
-      // Loop to handle paginated results from the Drive API.
-      do {
-        final fileList = await driveApi.files.list(
-          spaces: MultiCloudStorage.cloudAccess == CloudAccessType.appStorage
-              ? 'appDataFolder'
-              : 'drive',
-          q: "'${folder.id}' in parents and trashed = false",
-          $fields:
-          'nextPageToken, files(id, name, size, modifiedTime, mimeType, parents)',
-          pageToken: pageToken,
+      // Check if a file already exists at the remote path.
+      final existingFile = await _getFileByPath(remotePath);
+      if (existingFile != null && existingFile.id != null) {
+        // If it exists, update it using its file ID.
+        return uploadFileByShareToken(
+          localPath: localPath,
+          shareToken: existingFile.id!,
+          metadata: metadata,
         );
-        if (fileList.files != null) {
-          for (final file in fileList.files!) {
-            String currentItemPath = join(path, file.name ?? '');
-            if (path == '/' || path.isEmpty) currentItemPath = file.name ?? '';
-
-            // Convert Google Drive file object to a generic CloudFile.
-            cloudFiles.add(CloudFile(
-              path: currentItemPath,
-              name: file.name ?? 'Unnamed',
-              size: file.size == null ? null : int.tryParse(file.size!),
-              modifiedTime: file.modifiedTime ?? DateTime.now(),
-              isDirectory:
-              file.mimeType == 'application/vnd.google-apps.folder',
-              metadata: {
-                'id': file.id,
-                'mimeType': file.mimeType,
-                'parents': file.parents
-              },
-            ));
-          }
-        }
-        pageToken = fileList.nextPageToken;
-      } while (pageToken != null);
-
-      // If recursive is true, fetch files from all subdirectories.
-      if (recursive) {
-        final List<CloudFile> subFolderFiles = [];
-        for (final cf in cloudFiles) {
-          if (cf.isDirectory) {
-            subFolderFiles
-                .addAll(await listFiles(path: cf.path, recursive: true));
-          }
-        }
-        cloudFiles.addAll(subFolderFiles);
+      } else {
+        // If it doesn't exist, create it.
+        final file = File(localPath);
+        final fileName = basename(remotePath);
+        final remoteDir = dirname(remotePath) == '.' ? '' : dirname(remotePath);
+        // Ensure the parent directory exists.
+        final folder = await _getOrCreateFolder(remoteDir);
+        final driveFile = drive.File()
+          ..name = fileName
+          ..parents = [folder.id!];
+        final media = drive.Media(file.openRead(), await file.length());
+        final uploadedFile = await driveApi.files
+            .create(driveFile, uploadMedia: media, $fields: 'id, name');
+        return uploadedFile.id!;
       }
-      return cloudFiles;
     });
   }
 
@@ -413,7 +286,193 @@ class GoogleDriveProvider extends CloudStorageProvider {
     });
   }
 
-  // --- Helper Methods ---
+  @override
+  Future<String?> loggedInUserDisplayName() async {
+    return _googleSignIn?.currentUser?.displayName;
+  }
+
+  /// Checks if the current user's authentication token is expired.
+  @override
+  Future<bool> tokenExpired() {
+    return _executeRequest(() async {
+      // Make a lightweight API call to check token validity.
+      // If it succeeds, the token is valid. A 401/403 error is caught by
+      // _executeRequest, which then tries to re-authenticate.
+      await driveApi.about.get($fields: 'user');
+      return false;
+    })
+        .then((_) =>
+            false) // If the request (and potential retry) succeeds, token is not expired.
+        .catchError((_) =>
+            true); // If it ultimately fails, token is considered expired.
+  }
+
+  /// Logs out the current user from the cloud service.
+  @override
+  Future<bool> logout() async {
+    if (_isAuthenticated) {
+      try {
+        await signOut();
+        _isAuthenticated = false; // This is redundant due to signOut but safe.
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+    return false; // Already logged out.
+  }
+
+  /// Generates a shareable link for the file or directory at the [path].
+  @override
+  Future<Uri?> generateShareLink(String path) {
+    return _executeRequest(() async {
+      final drive.File? file = await _getFileByPath(path);
+      if (file == null || file.id == null) {
+        return null;
+      }
+      // Create a permission to make the file accessible to anyone with the link.
+      final permission = drive.Permission()
+        ..type = 'anyone'
+        ..role = 'writer'; // or 'reader'
+      await driveApi.permissions.create(permission, file.id!, $fields: 'id');
+      // Retrieve the file metadata again to get the shareable link.
+      final fileMetadata = await driveApi.files
+          .get(file.id!, $fields: 'id, name, webViewLink') as drive.File;
+      if (fileMetadata.webViewLink == null) {
+        return null;
+      }
+      return Uri.parse(fileMetadata.webViewLink!);
+    });
+  }
+
+  /// Extracts a share token from a given [shareLink].
+  @override
+  Future<String?> getShareTokenFromShareLink(Uri shareLink) async {
+    // Extracts the file ID from a standard Google Drive URL format.
+    // e.g., .../d/FILE_ID/edit
+    final regex = RegExp(r'd/([a-zA-Z0-9_-]+)');
+    final match = regex.firstMatch(shareLink.toString());
+    return match?.group(1);
+  }
+
+  /// Downloads a file to [localPath] using a [shareToken].
+  @override
+  Future<String> downloadFileByShareToken(
+      {required String shareToken, required String localPath}) {
+    return _executeRequest(() async {
+      final output = File(localPath);
+      final sink = output.openWrite();
+      try {
+        // Download the file directly using its ID (shareToken).
+        final media = await driveApi.files.get(shareToken,
+            downloadOptions: drive.DownloadOptions.fullMedia) as drive.Media;
+        await media.stream.pipe(sink);
+      } finally {
+        await sink.close();
+      }
+      return localPath;
+    });
+  }
+
+  /// Uploads a file from [localPath] using a [shareToken].
+  @override
+  Future<String> uploadFileByShareToken({
+    required String localPath,
+    required String shareToken,
+    Map<String, dynamic>? metadata,
+  }) {
+    return _executeRequest(() async {
+      final file = File(localPath);
+      final driveFile = drive.File(); // Empty file metadata for update
+      final media = drive.Media(file.openRead(), await file.length());
+      // Use the 'update' method with the file ID (shareToken) to overwrite content.
+      final updatedFile = await driveApi.files
+          .update(driveFile, shareToken, uploadMedia: media, $fields: 'id');
+      return updatedFile.id!;
+    });
+  }
+
+  /// Signs the user out of Google and disconnects the app.
+  static Future<void> signOut() async {
+    try {
+      await _googleSignIn?.disconnect();
+      await _googleSignIn?.signOut();
+    } catch (error, stackTrace) {
+      logger.e(
+        'Failed to sign out or disconnect from Google.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    } finally {
+      // Clear all state regardless of success or failure.
+      _googleSignIn = null;
+      if (_instance != null) {
+        _instance!._isAuthenticated = false;
+        _instance = null;
+      }
+      logger.i('User signed out from Google Drive.');
+    }
+  }
+
+  /// A wrapper for all API requests to centralize authentication checks and error handling.
+  ///
+  /// Executes the given `request` function. If an authentication error (401/403)
+  /// occurs, it triggers the automatic reconnection and retry logic.
+  Future<T> _executeRequest<T>(Future<T> Function() request) async {
+    _checkAuth();
+    try {
+      return await request();
+    } on drive.DetailedApiRequestError catch (e, stackTrace) {
+      // If the error is an auth token issue, try to recover.
+      if (e.status == 401 || e.status == 403) {
+        return _handleAuthErrorAndRetry(request, e, stackTrace);
+      }
+      // For other API errors, rethrow them.
+      rethrow;
+    } on AccessDeniedException catch (e, stackTrace) {
+      // Also handle auth errors from the underlying auth library.
+      return _handleAuthErrorAndRetry(request, e, stackTrace);
+    }
+  }
+
+  /// Throws an exception if the provider is not authenticated.
+  void _checkAuth() {
+    if (!_isAuthenticated || _instance == null) {
+      throw Exception(
+          'GoogleDriveProvider: Not authenticated. Call connect() first.');
+    }
+  }
+
+  /// A helper to handle auth errors by reconnecting and retrying the request.
+  ///
+  /// This is called when a 401/403 error occurs, indicating an expired token.
+  /// It attempts a silent reconnect to refresh the token and then retries the
+  /// original function `request`.
+  Future<T> _handleAuthErrorAndRetry<T>(
+      Future<T> Function() request, Object error, StackTrace stackTrace) async {
+    logger.w('Authentication error occurred. Attempting to reconnect...',
+        error: error, stackTrace: stackTrace);
+    _isAuthenticated = false;
+    // Silently try to reconnect to refresh the auth token.
+    final reconnectedProvider = await GoogleDriveProvider.connect();
+    if (reconnectedProvider != null && reconnectedProvider._isAuthenticated) {
+      logger.i('Successfully reconnected. Retrying the original request.');
+      // Retry the original request closure.
+      return await request();
+    } else {
+      logger
+          .e('Failed to reconnect after auth error. Throwing original error.');
+      // If reconnection fails, rethrow the original error to the caller.
+      throw error;
+    }
+  }
+
+  /// Gets the root folder ID ('appDataFolder' or 'root') based on the access type.
+  Future<String> _getRootFolderId() async {
+    return MultiCloudStorage.cloudAccess == CloudAccessType.appStorage
+        ? 'appDataFolder'
+        : 'root';
+  }
 
   /// Finds a folder by its full path, returning null if not found.
   Future<drive.File?> _getFolderByPath(String folderPath) async {
@@ -445,12 +504,12 @@ class GoogleDriveProvider extends CloudStorageProvider {
     }
 
     final normalizedPath =
-    filePath.replaceAll(RegExp(r'^/+'), '').replaceAll(RegExp(r'/+$'), '');
-    if (normalizedPath.isEmpty) return _getRootFolder();
-
+        filePath.replaceAll(RegExp(r'^/+'), '').replaceAll(RegExp(r'/+$'), '');
+    if (normalizedPath.isEmpty) {
+      return _getRootFolder();
+    }
     final parts = split(normalizedPath);
     drive.File currentFolder = await _getRootFolder();
-
     // Traverse the directory parts of the path.
     for (var i = 0; i < parts.length - 1; i++) {
       final folderName = parts[i];
@@ -461,10 +520,8 @@ class GoogleDriveProvider extends CloudStorageProvider {
       }
       currentFolder = folder;
     }
-
     final fileName = parts.last;
     if (fileName.isEmpty) return currentFolder; // Path was a directory.
-
     // Search for the file in the final parent directory.
     final query =
         "'${currentFolder.id}' in parents and name = '${_sanitizeQueryString(fileName)}' and trashed = false";
@@ -487,7 +544,6 @@ class GoogleDriveProvider extends CloudStorageProvider {
         .replaceAll(RegExp(r'^/+'), '')
         .replaceAll(RegExp(r'/+$'), '');
     if (normalizedPath.isEmpty) return _getRootFolder();
-
     final parts = split(normalizedPath);
     drive.File currentFolder = await _getRootFolder();
     // Traverse the path, creating folders as needed.
@@ -531,87 +587,4 @@ class GoogleDriveProvider extends CloudStorageProvider {
 
   /// Escapes single quotes in a string for use in a Drive API query.
   String _sanitizeQueryString(String value) => value.replaceAll("'", "\\'");
-
-  /// Logs out the current user from the cloud service.
-  @override
-  Future<bool> logout() async {
-    if (_isAuthenticated) {
-      try {
-        await signOut();
-        _isAuthenticated = false; // This is redundant due to signOut but safe.
-        return true;
-      } catch (e) {
-        return false;
-      }
-    }
-    return false; // Already logged out.
-  }
-
-  /// Checks if the current user's authentication token is expired.
-  @override
-  Future<bool> tokenExpired() {
-    return _executeRequest(() async {
-      // Make a lightweight API call to check token validity.
-      // If it succeeds, the token is valid. A 401/403 error is caught by
-      // _executeRequest, which then tries to re-authenticate.
-      await driveApi.about.get($fields: 'user');
-      return false;
-    }).then((_) => false) // If the request (and potential retry) succeeds, token is not expired.
-        .catchError((_) => true); // If it ultimately fails, token is considered expired.
-  }
-
-  /// Downloads a file to [localPath] using a [shareToken].
-  @override
-  Future<String> downloadFileByShareToken(
-      {required String shareToken, required String localPath}) {
-    return _executeRequest(() async {
-      final output = File(localPath);
-      final sink = output.openWrite();
-      try {
-        // Download the file directly using its ID (shareToken).
-        final media = await driveApi.files.get(shareToken,
-            downloadOptions: drive.DownloadOptions.fullMedia) as drive.Media;
-        await media.stream.pipe(sink);
-      } finally {
-        await sink.close();
-      }
-      return localPath;
-    });
-  }
-
-  /// Extracts a share token from a given [shareLink].
-  @override
-  Future<String?> getShareTokenFromShareLink(Uri shareLink) async {
-    // Extracts the file ID from a standard Google Drive URL format.
-    // e.g., .../d/FILE_ID/edit
-    final regex = RegExp(r'd/([a-zA-Z0-9_-]+)');
-    final match = regex.firstMatch(shareLink.toString());
-    return match?.group(1);
-  }
-
-  /// Generates a shareable link for the file or directory at the [path].
-  @override
-  Future<Uri?> generateShareLink(String path) {
-    return _executeRequest(() async {
-      final drive.File? file = await _getFileByPath(path);
-      if (file == null || file.id == null) {
-        return null;
-      }
-
-      // Create a permission to make the file accessible to anyone with the link.
-      final permission = drive.Permission()
-        ..type = 'anyone'
-        ..role = 'writer'; // or 'reader'
-
-      await driveApi.permissions.create(permission, file.id!, $fields: 'id');
-
-      // Retrieve the file metadata again to get the shareable link.
-      final fileMetadata = await driveApi.files
-          .get(file.id!, $fields: 'id, name, webViewLink') as drive.File;
-      if (fileMetadata.webViewLink == null) {
-        return null;
-      }
-      return Uri.parse(fileMetadata.webViewLink!);
-    });
-  }
 }

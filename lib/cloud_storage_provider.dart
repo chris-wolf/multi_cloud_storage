@@ -1,13 +1,8 @@
 abstract class CloudStorageProvider {
-
-  /// Retrieves the display name of the currently logged-in user.
-  Future<String?> loggedInUserDisplayName();
-
-  /// Uploads a file from a [localPath] to a [remotePath] in the cloud.
-  Future<String> uploadFile({
-    required String localPath,
-    required String remotePath,
-    Map<String, dynamic>? metadata,
+  /// Lists all files and directories at the specified [path].
+  Future<List<CloudFile>> listFiles({
+    required String path,
+    bool recursive = false,
   });
 
   /// Downloads a file from a [remotePath] to a [localPath] on the device.
@@ -16,10 +11,11 @@ abstract class CloudStorageProvider {
     required String localPath,
   });
 
-  /// Lists all files and directories at the specified [path].
-  Future<List<CloudFile>> listFiles({
-    required String path,
-    bool recursive = false,
+  /// Uploads a file from a [localPath] to a [remotePath] in the cloud.
+  Future<String> uploadFile({
+    required String localPath,
+    required String remotePath,
+    Map<String, dynamic>? metadata,
   });
 
   /// Deletes the file or directory at the specified [path].
@@ -31,11 +27,14 @@ abstract class CloudStorageProvider {
   /// Retrieves metadata for the file or directory at the specified [path].
   Future<CloudFile> getFileMetadata(String path);
 
-  /// Logs out the current user from the cloud service.
-  Future<bool> logout();
+  /// Retrieves the display name of the currently logged-in user.
+  Future<String?> loggedInUserDisplayName();
 
   /// Checks if the current user's authentication token is expired.
   Future<bool> tokenExpired();
+
+  /// Logs out the current user from the cloud service.
+  Future<bool> logout();
 
   /// Generates a shareable link for the file or directory at the [path].
   Future<Uri?> generateShareLink(String path);

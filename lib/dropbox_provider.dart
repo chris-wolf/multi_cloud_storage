@@ -21,7 +21,7 @@ class DropboxProvider extends CloudStorageProvider {
   final String _appSecret;
   final String _redirectUri;
 
-  // --- State Properties ---
+  // --- Token storage ---
   final _secureStorage = const FlutterSecureStorage();
   static const _kDropboxTokenKey = 'dropbox_token';
 
@@ -57,22 +57,18 @@ class DropboxProvider extends CloudStorageProvider {
       logger.w('No internet connection. Cannot connect to Dropbox.');
       return null;
     }
-
     if (appKey.isEmpty || appSecret.isEmpty || redirectUri.isEmpty) {
       logger.e(
           'Dropbox connection failed: App Key, Secret, or Redirect URI is missing.');
       return null;
     }
-
     final provider = DropboxProvider._create(
         appKey: appKey, appSecret: appSecret, redirectUri: redirectUri);
-
     // If interactive login is forced, clear any existing credentials.
     if (forceInteractive) {
       logger.i('Forcing interactive login, clearing existing token.');
       await provider._clearToken();
     }
-
     try {
       // Attempt to sign in silently with a stored token.
       DropboxToken? storedToken = await provider._getToken();
@@ -89,7 +85,6 @@ class DropboxProvider extends CloudStorageProvider {
             'Dropbox silent sign-in successful for ${provider._account?.email}');
         return provider;
       }
-
       // If no token exists, start the interactive login flow.
       logger.i('No valid token found. Starting interactive Dropbox login.');
       final authCode = await provider._getAuthCodeViaInteractiveFlow();
@@ -97,7 +92,6 @@ class DropboxProvider extends CloudStorageProvider {
         logger.i('Interactive Dropbox login cancelled by user.');
         return null;
       }
-
       await provider._completeConnection(authCode);
       await provider._saveToken(provider._token);
       logger.i(
@@ -112,6 +106,272 @@ class DropboxProvider extends CloudStorageProvider {
       await provider.logout();
       return null;
     }
+  }
+
+  /// Lists all files and directories at the specified [path].
+  @override
+  Future<List<CloudFile>> listFiles(
+      {String path = '', bool recursive = false}) {
+    return _executeRequest(() async {
+      final List<CloudFile> allFiles = [];
+      String? cursor;
+      bool hasMore = true;
+      String initialPath = path == '/' ? '' : _normalizePath(path);
+      logger.d(
+          'Listing files in Dropbox path: "$initialPath", recursive: $recursive');
+      // Paginate through results using the cursor until all files are fetched.
+      while (hasMore) {
+        Response response;
+        if (cursor == null) {
+          // First request.
+          response = await _dio.post(
+            'https://api.dropboxapi.com/2/files/list_folder',
+            data: jsonEncode(
+                {'path': initialPath, 'recursive': recursive, 'limit': 1000}),
+            options: Options(contentType: 'application/json'),
+          );
+        } else {
+          // Subsequent paged requests.
+          logger.d('Fetching next page of files with cursor...');
+          response = await _dio.post(
+            'https://api.dropboxapi.com/2/files/list_folder/continue',
+            data: jsonEncode({'cursor': cursor}),
+            options: Options(contentType: 'application/json'),
+          );
+        }
+        final entries = response.data['entries'] as List;
+        allFiles.addAll(
+            entries.map((e) => _mapToCloudFile(e as Map<String, dynamic>)));
+        hasMore = response.data['has_more'] as bool;
+        cursor = response.data['cursor'] as String?;
+      }
+      logger.i('Found ${allFiles.length} files/folders in "$initialPath".');
+      return allFiles;
+    });
+  }
+
+  /// Downloads a file from a [remotePath] to a [localPath] on the device.
+  @override
+  Future<String> downloadFile(
+      {required String remotePath, required String localPath}) {
+    return _executeRequest(() async {
+      final normalizedPath = _normalizePath(remotePath);
+      logger.d('Downloading from Dropbox path: $normalizedPath to $localPath');
+      final response = await _dio.post(
+        'https://content.dropboxapi.com/2/files/download',
+        options: Options(
+          headers: {
+            'Dropbox-API-Arg': jsonEncode({'path': normalizedPath})
+          },
+          responseType: ResponseType.stream, // Download as a stream.
+        ),
+      );
+      final file = File(localPath);
+      final sink = file.openWrite();
+      final Stream<Uint8List> stream = response.data.stream;
+      await stream.cast<List<int>>().pipe(sink); // Pipe stream to file.
+      logger.i('Successfully downloaded file to $localPath');
+      return localPath;
+    });
+  }
+
+  /// Uploads a file from a [localPath] to a [remotePath] in the dropbox.
+  @override
+  Future<String> uploadFile(
+      {required String localPath,
+      required String remotePath,
+      Map<String, dynamic>? metadata}) {
+    return _executeRequest(() async {
+      final file = File(localPath);
+      final fileSize = await file.length();
+      final normalizedPath = _normalizePath(remotePath);
+      logger.d('Uploading $localPath to Dropbox at $normalizedPath');
+      final response = await _dio.post(
+        'https://content.dropboxapi.com/2/files/upload',
+        data: file.openRead(),
+        options: Options(
+          headers: {
+            // Dropbox API arguments are passed in a JSON header.
+            'Dropbox-API-Arg': jsonEncode({
+              'path': normalizedPath,
+              'mode': 'overwrite',
+              'autorename': false,
+            }),
+            'Content-Type': 'application/octet-stream',
+            'Content-Length': fileSize,
+          },
+        ),
+      );
+      logger.i(
+          'Successfully uploaded file to Dropbox, ID: ${response.data['id']}');
+      return response.data['id'];
+    });
+  }
+
+  /// Deletes the file or directory at the specified [path].
+  @override
+  Future<void> deleteFile(String path) {
+    return _executeRequest(() async {
+      final normalizedPath = _normalizePath(path);
+      logger.d('Attempting to delete Dropbox path: $normalizedPath');
+      try {
+        await _dio.post(
+          'https://api.dropboxapi.com/2/files/delete_v2',
+          data: jsonEncode({'path': normalizedPath}),
+          options: Options(contentType: 'application/json'),
+        );
+        logger.i('Successfully deleted path: $normalizedPath');
+      } on DioException catch (e) {
+        // If the file doesn't exist, treat it as a successful deletion.
+        if (e.response?.data?['error_summary']
+                ?.contains('path_lookup/not_found') ==
+            true) {
+          logger.w(
+              'Path not found during deletion, considering it a success: $normalizedPath');
+        } else {
+          rethrow;
+        }
+      }
+    });
+  }
+
+  /// Creates a new directory at the specified [path].
+  @override
+  Future<void> createDirectory(String path) {
+    return _executeRequest(() async {
+      final normalizedPath = _normalizePath(path);
+      logger.d('Creating Dropbox directory: $normalizedPath');
+      try {
+        await _dio.post(
+          'https://api.dropboxapi.com/2/files/create_folder_v2',
+          data: jsonEncode({'path': normalizedPath, 'autorename': false}),
+          options: Options(contentType: 'application/json'),
+        );
+        logger.i('Successfully created directory: $normalizedPath');
+      } on DioException catch (e) {
+        // If the directory already exists, treat it as a success.
+        if (e.response?.data?['error_summary']
+                ?.contains('path/conflict/folder') ==
+            true) {
+          logger.w(
+              'Directory already exists, ignoring creation: $normalizedPath');
+        } else {
+          rethrow;
+        }
+      }
+    });
+  }
+
+  /// Retrieves metadata for the file or directory at the specified [path].
+  @override
+  Future<CloudFile> getFileMetadata(String path) {
+    return _executeRequest(() async {
+      final normalizedPath = _normalizePath(path);
+      logger.d('Getting metadata for Dropbox path: $normalizedPath');
+      final response = await _dio.post(
+        'https://api.dropboxapi.com/2/files/get_metadata',
+        data: jsonEncode({'path': normalizedPath}),
+        options: Options(contentType: 'application/json'),
+      );
+      return _mapToCloudFile(response.data);
+    });
+  }
+
+  /// Retrieves the display name of the currently logged-in user.
+  @override
+  Future<String?> loggedInUserDisplayName() async => _account?.displayName;
+
+  /// Checks if the current user's authentication token is expired.
+  @override
+  Future<bool> tokenExpired() async => _token?.isExpired ?? true;
+
+  /// Logs out the current user from dropbox.
+  @override
+  Future<bool> logout() async {
+    logger.i('Logging out from Dropbox.');
+    if (_isAuthenticated && _token != null) {
+      try {
+        // Attempt to revoke the token on Dropbox's servers.
+        await _dio.post('https://api.dropboxapi.com/2/auth/token/revoke');
+        logger.i('Successfully revoked Dropbox token via API.');
+      } catch (e) {
+        logger.w(
+            'Failed to revoke Dropbox token via API, but logging out locally anyway.',
+            error: e);
+      }
+    }
+    // Clear local state regardless of API call success.
+    await _clearToken();
+    _token = null;
+    _account = null;
+    _isAuthenticated = false;
+    return true;
+  }
+
+  /// Generates a shareable link for the file or directory at the [path].
+  @override
+  Future<Uri?> generateShareLink(String path) {
+    return _executeRequest(() async {
+      final normalizedPath = _normalizePath(path);
+      logger.d('Generating sharable link for Dropbox path: $normalizedPath');
+      try {
+        // Attempt to create a new public, editable share link.
+        final response = await _dio.post(
+          'https://api.dropboxapi.com/2/sharing/create_shared_link_with_settings',
+          data: jsonEncode({
+            'path': normalizedPath,
+            'settings': {'requested_visibility': 'public', 'access': 'editor'}
+          }),
+          options: Options(contentType: 'application/json'),
+        );
+        final url = response.data['url'];
+        logger.i('Created sharable link: $url');
+        return url == null ? null : Uri.parse(url);
+      } on DioException catch (e) {
+        // If a link already exists, fetch the existing one.
+        if (e.response?.data?['error_summary']
+                ?.contains('shared_link_already_exists') ==
+            true) {
+          logger.w(
+              'Share link already exists for $normalizedPath, fetching existing one.');
+          final listResponse = await _dio.post(
+            'https://api.dropboxapi.com/2/sharing/list_shared_links',
+            data: jsonEncode({'path': normalizedPath, 'direct_only': true}),
+            options: Options(contentType: 'application/json'),
+          );
+          final links = listResponse.data['links'] as List?;
+          if (links != null && links.isNotEmpty) {
+            final url = links.first['url'];
+            logger.i('Fetched existing sharable link: $url');
+            return url == null ? null : Uri.parse(url);
+          }
+        }
+        rethrow;
+      }
+      return null;
+    });
+  }
+
+  @override
+  Future<String?> getShareTokenFromShareLink(Uri shareLink) async {
+    throw UnsupportedError(
+        'getShareTokenFromShareLink is not supported for dropbox');
+  }
+
+  @override
+  Future<String> uploadFileByShareToken(
+      {required String localPath,
+      required String shareToken,
+      Map<String, dynamic>? metadata}) async {
+    throw UnsupportedError(
+        'uploadFileByShareToken is not supported for dropbox');
+  }
+
+  @override
+  Future<String> downloadFileByShareToken(
+      {required String shareToken, required String localPath}) async {
+    throw UnsupportedError(
+        'downloadFileByShareToken is not supported for dropbox');
   }
 
   /// A centralized wrapper for executing API requests.
@@ -145,220 +405,11 @@ class DropboxProvider extends CloudStorageProvider {
     }
   }
 
-  /// Retrieves the display name of the currently logged-in user.
-  @override
-  Future<String?> loggedInUserDisplayName() async => _account?.displayName;
-
-  /// Logs out the current user from dropbox.
-  @override
-  Future<bool> logout() async {
-    logger.i('Logging out from Dropbox.');
-    if (_isAuthenticated && _token != null) {
-      try {
-        // Attempt to revoke the token on Dropbox's servers.
-        await _dio.post('https://api.dropboxapi.com/2/auth/token/revoke');
-        logger.i('Successfully revoked Dropbox token via API.');
-      } catch (e) {
-        logger.w(
-            'Failed to revoke Dropbox token via API, but logging out locally anyway.',
-            error: e);
-      }
-    }
-    // Clear local state regardless of API call success.
-    await _clearToken();
-    _token = null;
-    _account = null;
-    _isAuthenticated = false;
-    return true;
-  }
-
-  /// Uploads a file from a [localPath] to a [remotePath] in the dropbox.
-  @override
-  Future<String> uploadFile(
-      {required String localPath,
-        required String remotePath,
-        Map<String, dynamic>? metadata}) {
-    return _executeRequest(() async {
-      final file = File(localPath);
-      final fileSize = await file.length();
-      final normalizedPath = _normalizePath(remotePath);
-
-      logger.d('Uploading $localPath to Dropbox at $normalizedPath');
-
-      final response = await _dio.post(
-        'https://content.dropboxapi.com/2/files/upload',
-        data: file.openRead(),
-        options: Options(
-          headers: {
-            // Dropbox API arguments are passed in a JSON header.
-            'Dropbox-API-Arg': jsonEncode({
-              'path': normalizedPath,
-              'mode': 'overwrite',
-              'autorename': false,
-            }),
-            'Content-Type': 'application/octet-stream',
-            'Content-Length': fileSize,
-          },
-        ),
-      );
-      logger.i(
-          'Successfully uploaded file to Dropbox, ID: ${response.data['id']}');
-      return response.data['id'];
-    });
-  }
-
-  /// Downloads a file from a [remotePath] to a [localPath] on the device.
-  @override
-  Future<String> downloadFile(
-      {required String remotePath, required String localPath}) {
-    return _executeRequest(() async {
-      final normalizedPath = _normalizePath(remotePath);
-      logger.d('Downloading from Dropbox path: $normalizedPath to $localPath');
-
-      final response = await _dio.post(
-        'https://content.dropboxapi.com/2/files/download',
-        options: Options(
-          headers: {
-            'Dropbox-API-Arg': jsonEncode({'path': normalizedPath})
-          },
-          responseType: ResponseType.stream, // Download as a stream.
-        ),
-      );
-
-      final file = File(localPath);
-      final sink = file.openWrite();
-
-      final Stream<Uint8List> stream = response.data.stream;
-      await stream.cast<List<int>>().pipe(sink); // Pipe stream to file.
-
-      logger.i('Successfully downloaded file to $localPath');
-      return localPath;
-    });
-  }
-
-  /// Lists all files and directories at the specified [path].
-  @override
-  Future<List<CloudFile>> listFiles(
-      {String path = '', bool recursive = false}) {
-    return _executeRequest(() async {
-      final List<CloudFile> allFiles = [];
-      String? cursor;
-      bool hasMore = true;
-      String initialPath = path == '/' ? '' : _normalizePath(path);
-
-      logger.d(
-          'Listing files in Dropbox path: "$initialPath", recursive: $recursive');
-
-      // Paginate through results using the cursor until all files are fetched.
-      while (hasMore) {
-        Response response;
-        if (cursor == null) {
-          // First request.
-          response = await _dio.post(
-            'https://api.dropboxapi.com/2/files/list_folder',
-            data: jsonEncode(
-                {'path': initialPath, 'recursive': recursive, 'limit': 1000}),
-            options: Options(contentType: 'application/json'),
-          );
-        } else {
-          // Subsequent paged requests.
-          logger.d('Fetching next page of files with cursor...');
-          response = await _dio.post(
-            'https://api.dropboxapi.com/2/files/list_folder/continue',
-            data: jsonEncode({'cursor': cursor}),
-            options: Options(contentType: 'application/json'),
-          );
-        }
-
-        final entries = response.data['entries'] as List;
-        allFiles.addAll(
-            entries.map((e) => _mapToCloudFile(e as Map<String, dynamic>)));
-
-        hasMore = response.data['has_more'] as bool;
-        cursor = response.data['cursor'] as String?;
-      }
-      logger.i('Found ${allFiles.length} files/folders in "$initialPath".');
-      return allFiles;
-    });
-  }
-
-  /// Deletes the file or directory at the specified [path].
-  @override
-  Future<void> deleteFile(String path) {
-    return _executeRequest(() async {
-      final normalizedPath = _normalizePath(path);
-      logger.d('Attempting to delete Dropbox path: $normalizedPath');
-      try {
-        await _dio.post(
-          'https://api.dropboxapi.com/2/files/delete_v2',
-          data: jsonEncode({'path': normalizedPath}),
-          options: Options(contentType: 'application/json'),
-        );
-        logger.i('Successfully deleted path: $normalizedPath');
-      } on DioException catch (e) {
-        // If the file doesn't exist, treat it as a successful deletion.
-        if (e.response?.data?['error_summary']
-            ?.contains('path_lookup/not_found') ==
-            true) {
-          logger.w(
-              'Path not found during deletion, considering it a success: $normalizedPath');
-        } else {
-          rethrow;
-        }
-      }
-    });
-  }
-
-  /// Creates a new directory at the specified [path].
-  @override
-  Future<void> createDirectory(String path) {
-    return _executeRequest(() async {
-      final normalizedPath = _normalizePath(path);
-      logger.d('Creating Dropbox directory: $normalizedPath');
-      try {
-        await _dio.post(
-          'https://api.dropboxapi.com/2/files/create_folder_v2',
-          data: jsonEncode({'path': normalizedPath, 'autorename': false}),
-          options: Options(contentType: 'application/json'),
-        );
-        logger.i('Successfully created directory: $normalizedPath');
-      } on DioException catch (e) {
-        // If the directory already exists, treat it as a success.
-        if (e.response?.data?['error_summary']
-            ?.contains('path/conflict/folder') ==
-            true) {
-          logger.w(
-              'Directory already exists, ignoring creation: $normalizedPath');
-        } else {
-          rethrow;
-        }
-      }
-    });
-  }
-
-  /// Retrieves metadata for the file or directory at the specified [path].
-  @override
-  Future<CloudFile> getFileMetadata(String path) {
-    return _executeRequest(() async {
-      final normalizedPath = _normalizePath(path);
-      logger.d('Getting metadata for Dropbox path: $normalizedPath');
-      final response = await _dio.post(
-        'https://api.dropboxapi.com/2/files/get_metadata',
-        data: jsonEncode({'path': normalizedPath}),
-        options: Options(contentType: 'application/json'),
-      );
-      return _mapToCloudFile(response.data);
-    });
-  }
-
-  //<editor-fold desc="Internal Methods">
-
   /// Initializes the Dio HTTP client with interceptors for auth and token refresh.
   void _initializeDio() {
     _dio = Dio(BaseOptions(
         sendTimeout: const Duration(seconds: 30),
         receiveTimeout: const Duration(seconds: 30)));
-
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) {
         // Add the Authorization header to every request.
@@ -376,7 +427,6 @@ class DropboxProvider extends CloudStorageProvider {
             await _saveToken(_token);
             logger.i(
                 'Dropbox token refreshed successfully. Retrying original request.');
-
             // Retry the original request with the new token.
             final response = await _dio.request(
               e.requestOptions.path,
@@ -471,7 +521,6 @@ class DropboxProvider extends CloudStorageProvider {
         }
       }
     });
-
     // Launch the auth URL in a web view.
     logger.i('Launching Dropbox authorization URL: $authUrl');
     if (!await launchUrl(uri,
@@ -481,7 +530,6 @@ class DropboxProvider extends CloudStorageProvider {
       logger.e(errorMsg);
       if (!codeCompleter.isCompleted) codeCompleter.completeError(errorMsg);
     }
-
     return codeCompleter.future;
   }
 
@@ -543,7 +591,9 @@ class DropboxProvider extends CloudStorageProvider {
 
   /// Normalizes a path for the Dropbox API (must start with '/').
   String _normalizePath(String path) {
-    if (path.isEmpty || path == '/') return ''; // Root is an empty string for Dropbox API.
+    if (path.isEmpty || path == '/') {
+      return ''; // Root is an empty string for Dropbox API.
+    }
     return p.url.normalize(path.startsWith('/') ? path : '/$path');
   }
 
@@ -555,7 +605,7 @@ class DropboxProvider extends CloudStorageProvider {
       name: data['name'],
       size: isDir ? null : data['size'],
       modifiedTime:
-      isDir ? null : DateTime.tryParse(data['server_modified'] ?? ''),
+          isDir ? null : DateTime.tryParse(data['server_modified'] ?? ''),
       isDirectory: isDir,
       metadata: {'id': data['id'], if (!isDir) 'rev': data['rev']},
     );
@@ -572,7 +622,7 @@ class DropboxProvider extends CloudStorageProvider {
       'code_challenge_method': 'S256',
       'code_challenge': _generateCodeChallengeS256(_pkceCodeVerifier!),
       'scope':
-      'account_info.read files.content.read files.content.write sharing.write',
+          'account_info.read files.content.read files.content.write sharing.write',
     };
     return Uri.https('www.dropbox.com', '/oauth2/authorize', queryParams)
         .toString();
@@ -592,74 +642,6 @@ class DropboxProvider extends CloudStorageProvider {
     return base64Url
         .encode(sha256.convert(utf8.encode(verifier)).bytes)
         .replaceAll('=', ''); // base64url encoding must not have padding.
-  }
-  //</editor-fold>
-
-  /// Checks if the current user's authentication token is expired.
-  @override
-  Future<bool> tokenExpired() async => _token?.isExpired ?? true;
-
-  /// Generates a shareable link for the file or directory at the [path].
-  @override
-  Future<Uri?> generateShareLink(String path) {
-    return _executeRequest(() async {
-      final normalizedPath = _normalizePath(path);
-      logger.d('Generating sharable link for Dropbox path: $normalizedPath');
-      try {
-        // Attempt to create a new public, editable share link.
-        final response = await _dio.post(
-          'https://api.dropboxapi.com/2/sharing/create_shared_link_with_settings',
-          data: jsonEncode({
-            'path': normalizedPath,
-            'settings': {'requested_visibility': 'public', 'access': 'editor'}
-          }),
-          options: Options(contentType: 'application/json'),
-        );
-        final url = response.data['url'];
-        logger.i('Created sharable link: $url');
-        return url == null ? null : Uri.parse(url);
-      } on DioException catch (e) {
-        // If a link already exists, fetch the existing one.
-        if (e.response?.data?['error_summary']
-            ?.contains('shared_link_already_exists') ==
-            true) {
-          logger.w(
-              'Share link already exists for $normalizedPath, fetching existing one.');
-          final listResponse = await _dio.post(
-            'https://api.dropboxapi.com/2/sharing/list_shared_links',
-            data: jsonEncode({'path': normalizedPath, 'direct_only': true}),
-            options: Options(contentType: 'application/json'),
-          );
-          final links = listResponse.data['links'] as List?;
-          if (links != null && links.isNotEmpty) {
-            final url = links.first['url'];
-            logger.i('Fetched existing sharable link: $url');
-            return url == null ? null : Uri.parse(url);
-          }
-        }
-        rethrow;
-      }
-      return null;
-    });
-  }
-
-  @override
-  Future<String> uploadFileByShareToken(
-      {required String localPath,
-        required String shareToken,
-        Map<String, dynamic>? metadata}) async {
-    throw UnsupportedError('uploadFileByShareToken is not supported for dropbox');
-  }
-
-  @override
-  Future<String> downloadFileByShareToken(
-      {required String shareToken, required String localPath}) async {
-    throw UnsupportedError('downloadFileByShareToken is not supported for dropbox');
-  }
-
-  @override
-  Future<String?> getShareTokenFromShareLink(Uri shareLink) async {
-    throw UnsupportedError('getShareTokenFromShareLink is not supported for dropbox');
   }
 }
 
@@ -696,7 +678,6 @@ class DropboxToken {
     } else {
       throw Exception("Invalid 'expires_in' format");
     }
-
     return DropboxToken(
       accessToken: json['access_token'] as String,
       refreshToken: json['refresh_token'] as String?,
@@ -707,11 +688,11 @@ class DropboxToken {
 
   /// Converts the [DropboxToken] to a JSON map for storage.
   Map<String, dynamic> toJson() => {
-    'access_token': accessToken,
-    'refresh_token': refreshToken,
-    'token_type': tokenType,
-    'expires_in': expiresIn.toIso8601String(),
-  };
+        'access_token': accessToken,
+        'refresh_token': refreshToken,
+        'token_type': tokenType,
+        'expires_in': expiresIn.toIso8601String(),
+      };
 
   /// Checks if the token is expired or close to expiring.
   bool get isExpired =>
@@ -741,7 +722,7 @@ class DropboxAccount {
       accountId: json['account_id'] as String,
       email: json['email'] as String,
       displayName:
-      (json['name'] as Map<String, dynamic>)['display_name'] as String,
+          (json['name'] as Map<String, dynamic>)['display_name'] as String,
     );
   }
 }
