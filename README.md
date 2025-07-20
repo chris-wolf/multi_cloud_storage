@@ -1,6 +1,6 @@
 # Multi Cloud Storage
 
-A Flutter plugin that provides a unified API for interacting with multiple cloud storage providers including Dropbox, Google Drive, and OneDrive.
+A Flutter plugin that provides a unified API for interacting with multiple cloud storage providers including Dropbox, Google Drive, OneDrive and iCloud.
 
 > ⚠️ **Disclaimer:** This package is in active development. Breaking changes may occur, and certain features or platforms may be incomplete or untested. Use with caution in production.
 

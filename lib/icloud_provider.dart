@@ -9,16 +9,11 @@ import 'package:path/path.dart' as p;
 import 'cloud_storage_provider.dart';
 import 'not_found_exception.dart';
 
-/// An implementation of [CloudStorageProvider] for Apple's iCloud Drive.
-///
-/// This provider uses the `iCloud_Storage_Sync` package to interact with iCloud.
-/// Note that iCloud functionality is only available on iOS devices.
 class ICloudStorageProvider extends CloudStorageProvider {
   late final IcloudStorageSync _icloudSync;
   late final String _containerId;
   static ICloudStorageProvider? _instance;
 
-  /// Private constructor for the singleton pattern.
   ICloudStorageProvider._create(this._containerId) {
     _icloudSync = IcloudStorageSync();
   }
@@ -41,10 +36,7 @@ class ICloudStorageProvider extends CloudStorageProvider {
     return _instance;
   }
 
-  //----------------------------------------------------------------------------
-  // ## Implemented Methods
-  //----------------------------------------------------------------------------
-
+  /// Uploads a file from a [localPath] to a [remotePath] in the cloud.
   @override
   Future<String> uploadFile({
     required String localPath,
@@ -60,6 +52,7 @@ class ICloudStorageProvider extends CloudStorageProvider {
     return remotePath;
   }
 
+  /// Downloads a file from a [remotePath] to a [localPath] on the device.
   @override
   Future<String> downloadFile({
     required String remotePath,
@@ -86,6 +79,7 @@ class ICloudStorageProvider extends CloudStorageProvider {
     }
   }
 
+  /// Lists all files and directories at the specified [path].
   @override
   Future<List<CloudFile>> listFiles({
     required String path,
@@ -122,6 +116,7 @@ class ICloudStorageProvider extends CloudStorageProvider {
     return results;
   }
 
+  /// Deletes the file or directory at the specified [path].
   @override
   Future<void> deleteFile(String path) async {
     await _icloudSync.delete(
@@ -130,6 +125,7 @@ class ICloudStorageProvider extends CloudStorageProvider {
     );
   }
 
+  /// Retrieves metadata for the file or directory at the specified [path].
   @override
   Future<CloudFile> getFileMetadata(String path) async {
     final allFiles = await _icloudSync.gather(containerId: _containerId);
@@ -154,10 +150,7 @@ class ICloudStorageProvider extends CloudStorageProvider {
     );
   }
 
-  //----------------------------------------------------------------------------
-  // ## Partially or Not Implemented Methods
-  //----------------------------------------------------------------------------
-
+  /// iCloud access is limited to the container and can't share files directly.
   @override
   Future<String> uploadFileByShareToken({
     required String localPath,
@@ -176,7 +169,7 @@ class ICloudStorageProvider extends CloudStorageProvider {
     throw UnimplementedError(
         'iCloudProvider: createDirectory is not supported. Directories are created automatically upon file upload.');
   }
-
+  /// logout not necessary since only current appleId user can login, so just clear isntance
   @override
   Future<bool> logout() async {
     _instance = null;
@@ -197,13 +190,14 @@ class ICloudStorageProvider extends CloudStorageProvider {
         'iCloudProvider: Cannot retrieve user display name.');
   }
 
+  /// iCloud access is limited to the container and can't share files directly.
   @override
   Future<Uri?> generateShareLink(String path) {
-    // The package does not support creating sharable links.
     throw UnimplementedError(
         'iCloudProvider: Generating sharable links is not supported.');
   }
 
+  /// iCloud access is limited to the container and can't share files directly.
   @override
   Future<String?> getShareTokenFromShareLink(Uri shareLink) async {
     return null; // The package does not support sharing.
@@ -217,6 +211,7 @@ class ICloudStorageProvider extends CloudStorageProvider {
     return path;
   }
 
+  /// iCloud access is limited to the container and can't share files directly.
   @override
   Future<String> downloadFileByShareToken(
       {required String shareToken, required String localPath}) {

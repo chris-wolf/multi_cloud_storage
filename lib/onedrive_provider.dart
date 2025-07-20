@@ -1,19 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_onedrive/flutter_onedrive.dart';
 import 'package:flutter_onedrive/token.dart';
 import 'package:http/http.dart' as http;
-
-// Assuming your global logger is accessible via main.dart
 import 'cloud_storage_provider.dart';
-import 'file_log_output.dart'; // Assuming you have these custom classes
+import 'file_log_output.dart';
 import 'multi_cloud_storage.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-
 import 'not_found_exception.dart';
 
 class OneDriveProvider extends CloudStorageProvider {
@@ -23,29 +19,35 @@ class OneDriveProvider extends CloudStorageProvider {
   final String redirectUri;
   final BuildContext context;
 
+  /// Private constructor to ensure a provider is created via the static [connect] method.
   OneDriveProvider._create({
     required this.clientId,
     required this.redirectUri,
     required this.context,
   });
 
-  static Future<OneDriveProvider?> connect(
-      {required String clientId,
-      required String redirectUri,
-      required BuildContext context,
-      String? scopes}) async {
+  /// Connects to OneDrive, handling both silent and interactive authentication.
+  static Future<OneDriveProvider?> connect({
+    required String clientId,
+    required String redirectUri,
+    required BuildContext context,
+    String? scopes,
+  }) async {
+    // Client ID is mandatory for Azure App registration.
     if (clientId.trim().isEmpty) {
       throw ArgumentError(
           'App registration required: https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade');
     }
+    // Provides a fallback native client redirect URI if none is supplied.
     if (redirectUri.isEmpty) {
       redirectUri =
-          'https://login.microsoftonline.com/common/oauth2/nativeclient'; //fallback: use native redirect
+      'https://login.microsoftonline.com/common/oauth2/nativeclient';
     }
 
     final provider = OneDriveProvider._create(
         clientId: clientId, redirectUri: redirectUri, context: context);
 
+    // Configure the client with appropriate scopes based on the desired access level.
     provider.client = OneDrive(
       clientID: clientId,
       redirectURL: redirectUri,
@@ -53,22 +55,18 @@ class OneDriveProvider extends CloudStorageProvider {
           "${MultiCloudStorage.cloudAccess == CloudAccessType.appStorage ? OneDrive.permissionFilesReadWriteAppFolder : OneDrive.permissionFilesReadWriteAll} offline_access User.Read Sites.ReadWrite.All",
     );
 
-    // 1. First, try to connect silently by checking for an existing token
-    final bool alreadyConnected = await provider.client.isConnected();
-
-    if (alreadyConnected) {
+    // 1. First, attempt to connect silently using a stored token.
+    if (await provider.client.isConnected()) {
       provider._isAuthenticated = true;
       logger.i("OneDriveProvider: Silently connected successfully.");
       return provider;
     }
 
-    // 2. If not connected, proceed with the interactive login
-    logger
-        .i("OneDriveProvider: Not connected, attempting interactive login...");
-    final success = await provider.client.connect(context);
-    if (success == false) {
+    // 2. If silent connection fails, fall back to interactive login via a WebView.
+    logger.i("OneDriveProvider: Not connected, attempting interactive login...");
+    if (await provider.client.connect(context) == false) {
       logger.i("OneDriveProvider: Interactive login failed or was cancelled.");
-      return null; // User cancelled or login failed
+      return null; // User cancelled or login failed.
     }
 
     provider._isAuthenticated = true;
@@ -76,17 +74,20 @@ class OneDriveProvider extends CloudStorageProvider {
     return provider;
   }
 
+  /// Throws an exception if the user is not authenticated.
   void _checkAuth() {
     if (!_isAuthenticated) {
-      throw Exception(
-          'OneDriveProvider: Not authenticated. Call connect() first.');
+      throw Exception('OneDriveProvider: Not authenticated. Call connect() first.');
     }
   }
 
+  /// A robust wrapper for executing all OneDrive API requests.
+  /// Handles authentication checks and centralized error logging.
+  /// It also detects token expiry errors to update the authentication state.
   Future<T> _executeRequest<T>(
-    Future<T> Function() request, {
-    required String operation,
-  }) async {
+      Future<T> Function() request, {
+        required String operation,
+      }) async {
     _checkAuth();
     try {
       logger.d('Executing OneDrive operation: $operation');
@@ -97,17 +98,16 @@ class OneDriveProvider extends CloudStorageProvider {
         error: e,
         stackTrace: stackTrace,
       );
-      // Check for authentication-related errors
-      if (e.toString().contains('401') ||
-          e.toString().contains('invalid_grant')) {
+      // If a 401 Unauthorized or invalid_grant error occurs, the token is likely expired.
+      if (e.toString().contains('401') || e.toString().contains('invalid_grant')) {
         _isAuthenticated = false;
-        logger.w(
-            'OneDrive token appears to be expired. User re-authentication is required.');
+        logger.w('OneDrive token appears to be expired. User re-authentication is required.');
       }
-      rethrow;
+      rethrow; // Rethrow the error to be handled by the calling function.
     }
   }
 
+  /// Uploads a file from a [localPath] to a [remotePath] in OneDrive.
   @override
   Future<String> uploadFile({
     required String localPath,
@@ -115,106 +115,106 @@ class OneDriveProvider extends CloudStorageProvider {
     Map<String, dynamic>? metadata,
   }) {
     return _executeRequest(
-      () async {
+          () async {
         final file = File(localPath);
         final bytes = await file.readAsBytes();
+        // The `isAppFolder` flag directs the upload to the special "App Root" folder.
         await client.push(bytes, remotePath,
-            isAppFolder:
-                MultiCloudStorage.cloudAccess == CloudAccessType.appStorage);
-        return remotePath;
+            isAppFolder: MultiCloudStorage.cloudAccess == CloudAccessType.appStorage);
+        return remotePath; // Return remote path on success.
       },
       operation: 'uploadFile to $remotePath',
     );
   }
 
+  /// Downloads a file from a [remotePath] to a [localPath] on the device.
   @override
   Future<String> downloadFile({
     required String remotePath,
     required String localPath,
   }) {
     return _executeRequest(
-      () async {
+          () async {
         final response = await client.pull(remotePath,
-            isAppFolder:
-                MultiCloudStorage.cloudAccess == CloudAccessType.appStorage);
+            isAppFolder: MultiCloudStorage.cloudAccess == CloudAccessType.appStorage);
         final file = File(localPath);
         await file.writeAsBytes(response.bodyBytes!);
-        return localPath;
+        return localPath; // Return local path on success.
       },
       operation: 'downloadFile from $remotePath',
     );
   }
 
+  /// Lists all files and directories at the specified [path].
   @override
   Future<List<CloudFile>> listFiles({
     String path = '',
     bool recursive = false,
   }) {
     return _executeRequest(
-      () async {
+          () async {
         final files = await client.listFiles(path,
             recursive: recursive,
-            isAppFolder:
-                MultiCloudStorage.cloudAccess == CloudAccessType.appStorage);
+            isAppFolder: MultiCloudStorage.cloudAccess == CloudAccessType.appStorage);
+        // Map the OneDrive-specific file objects to the generic CloudFile model.
         return files
             .map((oneDriveFile) => CloudFile(
-                path: oneDriveFile.path,
-                name: oneDriveFile.name,
-                size: oneDriveFile.size,
-                modifiedTime:
-                    DateTime.now(), // OneDrive SDK doesn't provide this
-                isDirectory: oneDriveFile.isFolder))
+            path: oneDriveFile.path,
+            name: oneDriveFile.name,
+            size: oneDriveFile.size,
+            modifiedTime: DateTime.now(), // HACK: SDK does not provide this field.
+            isDirectory: oneDriveFile.isFolder))
             .toList();
       },
       operation: 'listFiles at $path',
     );
   }
 
+  /// Deletes the file or directory at the specified [path].
   @override
   Future<void> deleteFile(String path) {
     return _executeRequest(
-      () => client.deleteFile(path,
-          isAppFolder:
-              MultiCloudStorage.cloudAccess == CloudAccessType.appStorage),
+          () => client.deleteFile(path,
+          isAppFolder: MultiCloudStorage.cloudAccess == CloudAccessType.appStorage),
       operation: 'deleteFile at $path',
     );
   }
 
+  /// Creates a new directory at the specified [path].
   @override
   Future<void> createDirectory(String path) {
     return _executeRequest(
-      () => client.createDirectory(path,
-          isAppFolder:
-              MultiCloudStorage.cloudAccess == CloudAccessType.appStorage),
+          () => client.createDirectory(path,
+          isAppFolder: MultiCloudStorage.cloudAccess == CloudAccessType.appStorage),
       operation: 'createDirectory at $path',
     );
   }
 
+  /// File Metadata not supported since flutter_onedrive does not provide it.
   @override
   Future<CloudFile> getFileMetadata(String path) {
     return _executeRequest(
-      () async {
-        // The package doesn't provide a direct get metadata method.
-        // This is a placeholder for a potential future implementation.
+          () async {
+        // The underlying package doesn't have a dedicated metadata fetch method.
         throw UnimplementedError('Get metadata functionality not implemented');
       },
       operation: 'getFileMetadata for $path',
     );
   }
 
+  /// Generates a shareable link for the file or directory at the [path].
   @override
   Future<Uri?> generateShareLink(String path) {
     return _executeRequest(
-      () async {
+          () async {
         final accessToken = await _getAccessToken();
         if (accessToken.isEmpty) {
-          logger.w(
-              "OneDriveProvider: No access token available for generating share link.");
+          logger.w("OneDriveProvider: No access token available for generating share link.");
           return null;
         }
 
-        final encodedPath = Uri.encodeComponent(
-            path.startsWith('/') ? path.substring(1) : path);
+        // Construct the Microsoft Graph API path to create a share link for the item.
+        final encodedPath = Uri.encodeComponent(path.startsWith('/') ? path.substring(1) : path);
         final driveItemPath = "/me/drive/root:/$encodedPath:/createLink";
 
         final response = await http.post(
@@ -223,58 +223,53 @@ class OneDriveProvider extends CloudStorageProvider {
             'Authorization': 'Bearer $accessToken',
             'Content-Type': 'application/json',
           },
-          body: jsonEncode({"type": "edit", "scope": "anonymous"}),
+          body: jsonEncode({"type": "edit", "scope": "anonymous"}), // Request an editable, public link.
         );
 
         if (response.statusCode != 200 && response.statusCode != 201) {
-          logger.e(
-              "Failed to create shareable link. Status: ${response.statusCode}, Body: ${response.body}");
+          logger.e("Failed to create shareable link. Status: ${response.statusCode}, Body: ${response.body}");
           return null;
         }
 
+        // Parse the link from the JSON response.
         final json = jsonDecode(response.body);
         final link = json['link']?['webUrl'];
-        if (link == null) {
-          logger.w("No shareable link was returned in the API response.");
-          return null;
-        }
-        return Uri.parse(link);
+        return link != null ? Uri.parse(link) : null;
       },
       operation: 'generateSharableLink for $path',
     );
   }
 
+  /// Logs out the current user from the cloud service.
   @override
   Future<bool> logout() async {
     logger.i("Logging out from OneDrive...");
-
-    // Get the InAppWebView CookieManager instance
     final cookieManager = CookieManager.instance();
 
     if (_isAuthenticated) {
       try {
-        // 1. Disconnect the client (clears local tokens)
+        // 1. Disconnect the client to clear local tokens.
         await client.disconnect();
         _isAuthenticated = false;
 
-        // 2. Clear all webview cookies to force a fresh login prompt next time
+        // 2. Clear all WebView cookies to ensure a fresh login prompt on the next connect attempt.
         await cookieManager.deleteAllCookies();
 
         logger.i("OneDrive logout successful and web cookies cleared.");
         return true;
       } catch (error, stackTrace) {
-        logger.e("Error during OneDrive logout.",
-            error: error, stackTrace: stackTrace);
+        logger.e("Error during OneDrive logout.", error: error, stackTrace: stackTrace);
         return false;
       }
     }
 
-    // Also clear cookies even if not authenticated, just to be safe
+    // Ensure cookies are cleared even if the client was already disconnected.
     await cookieManager.deleteAllCookies();
     logger.d("Already logged out from OneDrive, ensuring cookies are cleared.");
     return false;
   }
 
+  /// Retrieves the current access token from the underlying token manager.
   Future<String> _getAccessToken() async {
     final accessToken = await DefaultTokenManager(
       tokenEndpoint: OneDrive.tokenEndpoint,
@@ -284,58 +279,64 @@ class OneDriveProvider extends CloudStorageProvider {
     ).getAccessToken();
 
     if (accessToken == null || accessToken.isEmpty) {
-      throw Exception(
-          'Failed to retrieve a valid access token. Please re-authenticate.');
+      throw Exception('Failed to retrieve a valid access token. Please re-authenticate.');
     }
     return accessToken;
   }
 
+  /// Checks if the current user's authentication token is expired.
   @override
   Future<bool> tokenExpired() async {
     if (!_isAuthenticated) return true;
     try {
-      // Perform a lightweight, authenticated call to check token validity
+      // Check token validity by making a lightweight, authenticated API call.
+      // A successful call means the token is valid.
       await _executeRequest(
-        () => client.listFiles(
+            () => client.listFiles(
           '/',
-          isAppFolder:
-              MultiCloudStorage.cloudAccess == CloudAccessType.appStorage,
+          isAppFolder: MultiCloudStorage.cloudAccess == CloudAccessType.appStorage,
         ),
         operation: 'tokenExpiredCheck',
       );
-      return false; // Success means token is not expired
+      return false; // Success means token is not expired.
     } catch (e) {
-      // _executeRequest already logged the error.
-      // If it was a 401 error, _isAuthenticated is now false.
-      // Any exception here implies the token is not valid.
+      // Any exception here implies the token is invalid or expired.
+      // The error is already logged by _executeRequest.
       return true;
     }
   }
 
+  /// Share token is just the share link for OneDrive.
   @override
   Future<String?> getShareTokenFromShareLink(Uri shareLink) async {
-    return shareLink.toString(); // use full url as shareToken
+    // For OneDrive, the full shareable URL itself acts as the "share token".
+    return shareLink.toString();
   }
 
+  /// Encodes a URL into a Base64 string for use in API calls.
   String encodeShareUrl(Uri url) {
     final bytes = utf8.encode(url.toString());
     final base64Str = base64UrlEncode(bytes);
-    return base64Str.replaceAll('=', '');
+    return base64Str.replaceAll('=', ''); // Remove padding.
   }
 
+  /// Retrieves the display name of the currently logged-in user.
   @override
   Future<String?> loggedInUserDisplayName() {
     return _executeRequest(
-      () async {
+          () async {
         final accessToken = await _getAccessToken();
         if (accessToken.isEmpty) return null;
 
+        // Fetch user profile info from the Microsoft Graph `/me` endpoint.
         final response = await http.get(
           Uri.parse('https://graph.microsoft.com/v1.0/me'),
           headers: {'Authorization': 'Bearer $accessToken'},
         );
         if (response.statusCode != 200) return null;
+
         final json = jsonDecode(response.body);
+        // Prefer `displayName`, but fall back to `userPrincipalName` if it's not available.
         String? name = json['displayName'] as String?;
         if (name?.trim().isEmpty ?? true) {
           name = json['userPrincipalName'] as String?;
@@ -346,6 +347,10 @@ class OneDriveProvider extends CloudStorageProvider {
     );
   }
 
+  /// Downloads a file to [localPath] using a [shareToken].
+  /// Didn't manage to make the download work via the microsoft graph api.
+  /// So this functions uses the shareLink with &download=1 to download the file via a headless browser.
+  /// Would be glad if someone could rewrite this to use the microsoft graph api if possible.
   @override
   Future<String> downloadFileByShareToken({
     required String shareToken,
@@ -354,13 +359,13 @@ class OneDriveProvider extends CloudStorageProvider {
     final completer = Completer<String>();
     late HeadlessInAppWebView headlessWebView;
 
-    final initialUrl =
-        Uri.parse(shareToken).replace(queryParameters: {'download': '1'});
-
+    // Append `?download=1` to the share link to hint at a direct download.
+    final initialUrl = Uri.parse(shareToken).replace(queryParameters: {'download': '1'});
     logger.i("Starting headless WebView to resolve download for: $initialUrl");
 
     headlessWebView = HeadlessInAppWebView(
         initialUrlRequest: URLRequest(url: WebUri.uri(initialUrl)),
+        // This callback captures the final download URL after all redirects.
         onDownloadStartRequest: (controller, downloadStartRequest) async {
           final finalUrl = downloadStartRequest.url.toString();
           logger.i("WebView captured final download URL: $finalUrl");
@@ -374,43 +379,35 @@ class OneDriveProvider extends CloudStorageProvider {
             completer.completeError(Exception("WebView error: $message"));
           }
         },
+        // Handles cases where the WebView lands on an error page instead of triggering a download.
         onLoadStop: (controller, url) async {
           if (!completer.isCompleted) {
             final pageBody = await controller.getHtml() ?? "";
-            if (pageBody.toLowerCase().contains("error") ||
-                pageBody.toLowerCase().contains("denied")) {
-              if (pageBody.contains('-1007')) {
-                completer.completeError(NotFoundException(
-                    "WebView navigation ended on an error page."));
-              } else {
-                completer.completeError(
-                    Exception("WebView navigation ended on an error page."));
-              }
+            if (pageBody.toLowerCase().contains("error") || pageBody.toLowerCase().contains("denied")) {
+              completer.completeError(NotFoundException("WebView navigation ended on an error page. File may not exist or permissions are denied."));
             }
           }
         });
 
     try {
       await headlessWebView.run();
-      final finalDownloadUrl =
-          await completer.future.timeout(const Duration(seconds: 30));
+      // Wait for the download URL to be captured, with a timeout.
+      final finalDownloadUrl = await completer.future.timeout(const Duration(seconds: 30));
       await headlessWebView.dispose();
 
-      // --- FINAL DIO DOWNLOAD ---
-      // Create a Dio instance and add our custom interceptor.
+      // --- Use Dio with a custom interceptor for the final download ---
       final dio = Dio();
+      // This interceptor will attach the cookies gathered by the WebView to the Dio request.
       dio.interceptors.add(WebViewCookieInterceptor());
 
       logger.i("Downloading with Dio using WebView cookies and Referer.");
-
-      // This request will now have User-Agent, Referer, AND Cookies.
-      final result = await dio.download(
+      await dio.download(
         finalDownloadUrl,
         localPath,
         options: Options(
           headers: {
-            'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+            // Set a common User-Agent and Referer to mimic a browser request.
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
             'Referer': shareToken,
           },
         ),
@@ -419,56 +416,45 @@ class OneDriveProvider extends CloudStorageProvider {
       logger.i("File successfully downloaded to $localPath");
       return localPath;
     } catch (e, stackTrace) {
-      logger.e("Error during WebView download process",
-          error: e, stackTrace: stackTrace);
+      logger.e("Error during WebView download process", error: e, stackTrace: stackTrace);
       await headlessWebView.dispose();
       rethrow;
     }
   }
 
-  // The _ResolvedShareInfo class from Section 3 is reused.
-// The _resolveShareUrl function needs a slight modification to include remoteItem.
-
+  /// Resolves a sharing URL to get the stable drive and item identifiers needed for API calls.
+  /// This is crucial because a share link can point to an item on a different user's OneDrive.
   Future<_ResolvedShareInfo?> _resolveShareUrlForUpload(String shareUrl) async {
     final accessToken = await _getAccessToken();
     final String encodedUrl = _encodeShareUrlForGraphAPI(shareUrl);
-    // Request remoteItem to handle cross-drive scenarios
-    final resolveUri = Uri.parse(
-        'https://graph.microsoft.com/v1.0/shares/$encodedUrl/driveItem?\$select=id,driveId,parentReference,remoteItem');
+    // Request `remoteItem` to handle files shared from another user's drive.
+    final resolveUri = Uri.parse('https://graph.microsoft.com/v1.0/shares/$encodedUrl/driveItem?\$select=id,driveId,parentReference,remoteItem');
 
     final response = await http.get(resolveUri, headers: {
       'Authorization': 'Bearer $accessToken',
-      'Prefer': 'redeemSharingLink',
+      'Prefer': 'redeemSharingLink', // Special header to process the share link.
     });
 
     if (response.statusCode != 200) {
-      logger.e(
-          'Failed to resolve share URL. Status: ${response.statusCode}, Body: ${response.body}');
+      logger.e('Failed to resolve share URL. Status: ${response.statusCode}, Body: ${response.body}');
       return null;
     }
 
     final json = jsonDecode(response.body);
 
-    // Check for remoteItem first, as it indicates a shared-in file from another drive.
+    // If `remoteItem` exists, the file is on another drive. Use its identifiers.
     final remoteItem = json['remoteItem'];
-    if (remoteItem != null &&
-        remoteItem['id'] != null &&
-        remoteItem['driveId'] != null) {
+    if (remoteItem != null && remoteItem['id'] != null && remoteItem['driveId'] != null) {
       logger.i("Resolved a remote item from another drive.");
-      return _ResolvedShareInfo(
-        driveId: remoteItem['driveId'],
-        itemId: remoteItem['id'],
-      );
+      return _ResolvedShareInfo(driveId: remoteItem['driveId'], itemId: remoteItem['id']);
     }
 
-    // Fallback for items in the user's own drive.
+    // Otherwise, it's an item on the current user's own drive.
     final String? itemId = json['id'];
-    // CORRECTED LINE: Access driveId from within parentReference.
     final String? driveId = json['parentReference']?['driveId'];
 
     if (itemId == null || driveId == null) {
-      logger.e(
-          'Could not extract driveId and itemId from resolved share response. Body: ${response.body}');
+      logger.e('Could not extract driveId and itemId from resolved share response. Body: ${response.body}');
       return null;
     }
 
@@ -476,6 +462,7 @@ class OneDriveProvider extends CloudStorageProvider {
     return _ResolvedShareInfo(driveId: driveId, itemId: itemId);
   }
 
+  /// Uploads a file from [localPath] using a [shareToken].
   @override
   Future<String> uploadFileByShareToken({
     required String localPath,
@@ -483,58 +470,50 @@ class OneDriveProvider extends CloudStorageProvider {
     Map<String, dynamic>? metadata,
   }) {
     return _executeRequest(
-      () async {
+          () async {
         final accessToken = await _getAccessToken();
-        // Step 1: Resolve the sharing URL to get the correct, stable identifiers.
-        // This version of resolve handles the remoteItem facet.
+        // 1. Resolve the share URL to get the file's stable driveId and itemId.
         final resolvedInfo = await _resolveShareUrlForUpload(shareToken);
         if (resolvedInfo == null) {
-          throw Exception(
-              'Could not resolve the provided sharing URL for upload.');
+          throw Exception('Could not resolve the provided sharing URL for upload.');
         }
 
-        // Step 2: Prepare and execute the PUT request to overwrite the file content.
-        final uploadUri = Uri.parse(
-            'https://graph.microsoft.com/v1.0/drives/${resolvedInfo.driveId}/items/${resolvedInfo.itemId}/content');
-
+        // 2. Construct the Graph API URL to overwrite the file's content using its resolved IDs.
+        final uploadUri = Uri.parse('https://graph.microsoft.com/v1.0/drives/${resolvedInfo.driveId}/items/${resolvedInfo.itemId}/content');
         final fileBytes = await File(localPath).readAsBytes();
 
+        // 3. Perform a PUT request with the file bytes to replace the content.
         final uploadResponse = await http.put(
           uploadUri,
           headers: {
-            'Authorization':
-                'Bearer $accessToken', // Replace with actual token retrieval
-            // Use a generic content type, or determine it from the file extension.
-            'Content-Type': 'application/octet-stream',
+            'Authorization': 'Bearer $accessToken',
+            'Content-Type': 'application/octet-stream', // Generic byte stream type.
           },
           body: fileBytes,
         );
 
-        // A successful upload returns a 200 or 201 status code.
-        if (uploadResponse.statusCode >= 200 &&
-            uploadResponse.statusCode < 300) {
+        // A 200 or 201 status indicates a successful upload.
+        if (uploadResponse.statusCode >= 200 && uploadResponse.statusCode < 300) {
           logger.i('Successfully uploaded file to shared URL location.');
-          // Return the original shareUrl to signify success on the target resource.
-          return shareToken;
+          return shareToken; // Return the original token on success.
         } else {
-          throw Exception(
-              'Failed to upload file content. Status: ${uploadResponse.statusCode}, Body: ${uploadResponse.body}');
+          throw Exception('Failed to upload file content. Status: ${uploadResponse.statusCode}, Body: ${uploadResponse.body}');
         }
       },
       operation: 'uploadToSharedUrl: $shareToken',
     );
   }
 
-  /// Encodes a sharing URL into the format required by the Microsoft Graph API's /shares endpoint.
+  /// Encodes a sharing URL into the special format required by the Microsoft Graph API.
+  /// Format: `u!{base64-encoded-url}`
   /// See: https://learn.microsoft.com/en-us/graph/api/shares-get?view=graph-rest-1.0
   String _encodeShareUrlForGraphAPI(String url) {
-    // Use the built-in URL-safe Base64 encoder. It omits padding correctly.
     final String base64UrlString = base64Url.encode(utf8.encode(url));
     return 'u!$base64UrlString';
   }
 }
 
-// Helper class to hold the resolved identifiers
+/// A helper class to store the resolved Drive ID and Item ID from a share link.
 class _ResolvedShareInfo {
   final String driveId;
   final String itemId;
@@ -542,28 +521,25 @@ class _ResolvedShareInfo {
   _ResolvedShareInfo({required this.driveId, required this.itemId});
 }
 
-// This custom interceptor bridges the WebView's cookies to Dio's requests.
+/// A custom Dio interceptor that injects cookies from a `flutter_inappwebview`
+/// instance into outgoing HTTP requests. This is essential for authenticated downloads.
 class WebViewCookieInterceptor extends Interceptor {
   @override
-  void onRequest(
-      RequestOptions options, RequestInterceptorHandler handler) async {
-    // **CORRECTION IS HERE**: Change .instance to .instance()
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
     final cookieManager = CookieManager.instance();
 
-    // Get the cookies for the request's URL.
-    final cookies =
-        await cookieManager.getCookies(url: WebUri.uri(options.uri));
+    // Get all cookies associated with the request's domain.
+    final cookies = await cookieManager.getCookies(url: WebUri.uri(options.uri));
 
-    // Format the cookies into a single string.
-    final cookieHeader =
-        cookies.map((cookie) => '${cookie.name}=${cookie.value}').join('; ');
+    // Format the cookies into a single `Cookie` header string.
+    final cookieHeader = cookies.map((cookie) => '${cookie.name}=${cookie.value}').join('; ');
 
-    // Add the cookie header to the request if it's not empty.
+    // Add the cookie header to the request if any cookies were found.
     if (cookieHeader.isNotEmpty) {
       options.headers['cookie'] = cookieHeader;
     }
 
-    // Continue with the request.
+    // Continue with the modified request.
     handler.next(options);
   }
 }
