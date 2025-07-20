@@ -16,34 +16,37 @@ A Flutter plugin that provides a unified API for interacting with multiple cloud
 
 ## Supported Platforms
 
-| Service | App Folder | Full Access | Android | iOS | Mac | Windows | Linux |
-| ------------- |:----------:|:-----------:|:-------:|:---:|:----:|:-------:|:-----:|
-| OneDrive | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ❌ |
-| Google Drive | ✅ | ✅ | ✅ | ✅ | ⚠️ | ❌ | ❌ |
-| Dropbox | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ |
-| iCloud | ✅ | ❌ | ❌ | ✅ | ⚠️ | ⚠️ | ❌ |
+| Service     | Android | iOS | Mac | Windows | Linux |
+|-------------|:-------:|:---:|:----:|:-------:|:-----:|
+| OneDrive    | ✅      | ✅  | ⚠️   | ⚠️      | ❌    |
+| Google Drive| ✅      | ✅  | ⚠️   | ❌      | ❌    |
+| Dropbox     | ✅      | ✅  | ⚠️   | ⚠️      | ⚠️    |
+| iCloud      | ❌      | ✅  | ⚠️   | ⚠️      | ❌    |
 
-⚠️ = Still untested, but should work.
+
+⚠️ = Still untested, but should work with correct setup.
 
 
 
 
 ## Supported Functions
-| Methods                         | OneDrive | Google Drive | Dropbox | iCloud |
-|---------------------------------|----------|--------------|---------|--------|
-| listFiles                      | ✅       | ✅           | ✅      | ✅     |
-| uploadFile                     | ✅       | ✅           | ✅      | ✅     |
-| downloadFile                   | ✅       | ✅           | ✅      | ✅     |
-| deleteFile                     | ✅       | ✅           | ✅      | ✅     |
-| createDirectory                | ✅       | ✅           | ✅      | ❌     |
-| getFileMetadata                | ❌       | ✅           | ✅      | ✅     |
-| logout                         | ✅       | ✅           | ✅      | ✅     |
-| tokenExpired                   | ✅       | ✅           | ✅      | ✅     |
-| loggedInUserDisplayName        | ✅       | ✅           | ✅      | ❌     |
-| generateShareLink              | ✅       | ✅           | ✅      | ❌     |
-| getShareTokenFromShareLink    | ✅       | ✅           | ❌      | ❌     |
-| downloadFileByShareToken      | ✅       | ✅           | ❌      | ❌     |
-| uploadFileByShareToken        | ✅       | ✅           | ❌      | ❌     |
+| Functions                  | OneDrive | Google Drive | Dropbox | iCloud |
+|----------------------------|----------|--------------|---------|--------|
+| App Folder                 | ✅       | ✅           | ✅      | ✅     |
+| Full Access                | ✅       | ✅           | ✅      | ❌     |
+| listFiles                  | ✅       | ✅           | ✅      | ✅     |
+| uploadFile                 | ✅       | ✅           | ✅      | ✅     |
+| downloadFile               | ✅       | ✅           | ✅      | ✅     |
+| deleteFile                 | ✅       | ✅           | ✅      | ✅     |
+| createDirectory            | ✅       | ✅           | ✅      | ❌     |
+| getFileMetadata            | ❌       | ✅           | ✅      | ✅     |
+| logout                     | ✅       | ✅           | ✅      | ✅     |
+| tokenExpired               | ✅       | ✅           | ✅      | ✅     |
+| loggedInUserDisplayName    | ✅       | ✅           | ✅      | ❌     |
+| generateShareLink          | ✅       | ✅           | ✅      | ❌     |
+| getShareTokenFromShareLink | ✅       | ✅           | ❌      | ❌     |
+| downloadFileByShareToken   | ✅       | ✅           | ❌      | ❌     |
+| uploadFileByShareToken     | ✅       | ✅           | ❌      | ❌     |
 
 ---
 
