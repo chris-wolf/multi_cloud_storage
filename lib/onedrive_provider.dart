@@ -6,11 +6,12 @@ import 'package:flutter_onedrive/flutter_onedrive.dart';
 import 'package:flutter_onedrive/token.dart';
 import 'package:http/http.dart' as http;
 import 'cloud_storage_provider.dart';
+import 'exceptions/no_connection_exception.dart';
 import 'file_log_output.dart';
 import 'multi_cloud_storage.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import 'not_found_exception.dart';
+import 'exceptions/not_found_exception.dart';
 
 class OneDriveProvider extends CloudStorageProvider {
   late OneDrive client;
@@ -43,31 +44,39 @@ class OneDriveProvider extends CloudStorageProvider {
       redirectUri =
           'https://login.microsoftonline.com/common/oauth2/nativeclient';
     }
-    final provider = OneDriveProvider._create(
-        clientId: clientId, redirectUri: redirectUri, context: context);
-    // Configure the client with appropriate scopes based on the desired access level.
-    provider.client = OneDrive(
-      clientID: clientId,
-      redirectURL: redirectUri,
-      scopes: scopes ??
-          "${MultiCloudStorage.cloudAccess == CloudAccessType.appStorage ? OneDrive.permissionFilesReadWriteAppFolder : OneDrive.permissionFilesReadWriteAll} offline_access User.Read Sites.ReadWrite.All",
-    );
-    // 1. First, attempt to connect silently using a stored token.
-    if (await provider.client.isConnected()) {
+    try {
+      final provider = OneDriveProvider._create(
+              clientId: clientId, redirectUri: redirectUri, context: context);
+      // Configure the client with appropriate scopes based on the desired access level.
+      provider.client = OneDrive(
+            clientID: clientId,
+            redirectURL: redirectUri,
+            scopes: scopes ??
+                "${MultiCloudStorage.cloudAccess == CloudAccessType.appStorage ? OneDrive.permissionFilesReadWriteAppFolder : OneDrive.permissionFilesReadWriteAll} offline_access User.Read Sites.ReadWrite.All",
+          );
+      // 1. First, attempt to connect silently using a stored token.
+      if (await provider.client.isConnected()) {
+            provider._isAuthenticated = true;
+            logger.i("OneDriveProvider: Silently connected successfully.");
+            return provider;
+          }
+      // 2. If silent connection fails, fall back to interactive login via a WebView.
+      logger
+              .i("OneDriveProvider: Not connected, attempting interactive login...");
+      if (await provider.client.connect(context) == false) {
+            logger.i("OneDriveProvider: Interactive login failed or was cancelled.");
+            return null; // User cancelled or login failed.
+          }
       provider._isAuthenticated = true;
-      logger.i("OneDriveProvider: Silently connected successfully.");
+      logger.i("OneDriveProvider: Interactive login successful.");
       return provider;
+    } on SocketException catch (e, stackTrace) {
+      logger.w('No connection detected.', error: e, stackTrace: stackTrace);
+      throw NoConnectionException(e.message);
+    }  catch (e, stackTrace) {
+      logger.w('Exception', error: e, stackTrace: stackTrace);
+      rethrow;
     }
-    // 2. If silent connection fails, fall back to interactive login via a WebView.
-    logger
-        .i("OneDriveProvider: Not connected, attempting interactive login...");
-    if (await provider.client.connect(context) == false) {
-      logger.i("OneDriveProvider: Interactive login failed or was cancelled.");
-      return null; // User cancelled or login failed.
-    }
-    provider._isAuthenticated = true;
-    logger.i("OneDriveProvider: Interactive login successful.");
-    return provider;
   }
 
   /// Lists all files and directories at the specified [path].
@@ -108,8 +117,19 @@ class OneDriveProvider extends CloudStorageProvider {
         final response = await client.pull(remotePath,
             isAppFolder:
                 MultiCloudStorage.cloudAccess == CloudAccessType.appStorage);
+
+        if (response.statusCode == 404) {
+          throw NotFoundException(response.message ?? response.toString());
+        }
+        if (response.message?.contains('SocketException') ?? false) {
+          throw NoConnectionException(response.message ?? response.toString());
+        }
         final file = File(localPath);
-        await file.writeAsBytes(response.bodyBytes!);
+        if (response.bodyBytes == null) {
+          throw Exception(response.message);
+        } else {
+          await file.writeAsBytes(response.bodyBytes!);
+        }
         return localPath; // Return local path on success.
       },
       operation: 'downloadFile from $remotePath',
@@ -128,9 +148,12 @@ class OneDriveProvider extends CloudStorageProvider {
         final file = File(localPath);
         final bytes = await file.readAsBytes();
         // The `isAppFolder` flag directs the upload to the special "App Root" folder.
-        await client.push(bytes, remotePath,
+        final response = await client.push(bytes, remotePath,
             isAppFolder:
                 MultiCloudStorage.cloudAccess == CloudAccessType.appStorage);
+        if (response.message?.contains('SocketException') ?? false) {
+          throw NoConnectionException(response.message ?? response.toString());
+        }
         return remotePath; // Return remote path on success.
       },
       operation: 'uploadFile to $remotePath',
@@ -141,9 +164,14 @@ class OneDriveProvider extends CloudStorageProvider {
   @override
   Future<void> deleteFile(String path) {
     return _executeRequest(
-      () => client.deleteFile(path,
-          isAppFolder:
-              MultiCloudStorage.cloudAccess == CloudAccessType.appStorage),
+      () async {
+        final response = await client.deleteFile(path,
+            isAppFolder:
+            MultiCloudStorage.cloudAccess == CloudAccessType.appStorage);
+        if (response.message?.contains('SocketException') ?? false) {
+          throw NoConnectionException(response.message ?? response.toString());
+        }
+      },
       operation: 'deleteFile at $path',
     );
   }
@@ -152,9 +180,14 @@ class OneDriveProvider extends CloudStorageProvider {
   @override
   Future<void> createDirectory(String path) {
     return _executeRequest(
-      () => client.createDirectory(path,
-          isAppFolder:
-              MultiCloudStorage.cloudAccess == CloudAccessType.appStorage),
+      () async {
+        final response = await client.createDirectory(path,
+            isAppFolder:
+            MultiCloudStorage.cloudAccess == CloudAccessType.appStorage);
+        if (response.message?.contains('SocketException') ?? false) {
+          throw NoConnectionException(response.message ?? response.toString());
+        }
+      },
       operation: 'createDirectory at $path',
     );
   }
@@ -203,7 +236,7 @@ class OneDriveProvider extends CloudStorageProvider {
     try {
       // Check token validity by making a lightweight, authenticated API call.
       // A successful call means the token is valid.
-      await _executeRequest(
+      final respone = await _executeRequest(
         () => client.listFiles(
           '/',
           isAppFolder:
@@ -423,7 +456,10 @@ class OneDriveProvider extends CloudStorageProvider {
     try {
       logger.d('Executing OneDrive operation: $operation');
       return await request();
-    } catch (e, stackTrace) {
+    }  on SocketException catch (e, stackTrace) {
+      logger.w('No connection detected.', error: e, stackTrace: stackTrace);
+      throw NoConnectionException(e.message);
+    }catch (e, stackTrace) {
       logger.e(
         'Error during OneDrive operation: $operation',
         error: e,

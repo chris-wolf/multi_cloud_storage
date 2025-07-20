@@ -4,7 +4,6 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:app_links/app_links.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -13,6 +12,8 @@ import 'package:path/path.dart' as p;
 import 'package:url_launcher/url_launcher.dart';
 
 import 'cloud_storage_provider.dart';
+import 'exceptions/no_connection_exception.dart';
+import 'exceptions/not_found_exception.dart';
 import 'file_log_output.dart';
 
 class DropboxProvider extends CloudStorageProvider {
@@ -52,16 +53,12 @@ class DropboxProvider extends CloudStorageProvider {
     bool forceInteractive = false,
   }) async {
     logger.i('connect Dropbox, forceInteractive: $forceInteractive');
-    final connectivityResult = await (Connectivity().checkConnectivity());
-    if (connectivityResult.contains(ConnectivityResult.none)) {
-      logger.w('No internet connection. Cannot connect to Dropbox.');
-      return null;
-    }
     if (appKey.isEmpty || appSecret.isEmpty || redirectUri.isEmpty) {
       logger.e(
           'Dropbox connection failed: App Key, Secret, or Redirect URI is missing.');
       return null;
     }
+    try {
     final provider = DropboxProvider._create(
         appKey: appKey, appSecret: appSecret, redirectUri: redirectUri);
     // If interactive login is forced, clear any existing credentials.
@@ -69,7 +66,6 @@ class DropboxProvider extends CloudStorageProvider {
       logger.i('Forcing interactive login, clearing existing token.');
       await provider._clearToken();
     }
-    try {
       // Attempt to sign in silently with a stored token.
       DropboxToken? storedToken = await provider._getToken();
       if (storedToken != null) {
@@ -97,14 +93,16 @@ class DropboxProvider extends CloudStorageProvider {
       logger.i(
           'Interactive Dropbox login successful for ${provider._account?.email}');
       return provider;
+    }  on SocketException catch (e, stackTrace) {
+      logger.w('No connection detected.', error: e, stackTrace: stackTrace);
+      throw NoConnectionException(e.message);
     } catch (error, stackTrace) {
       logger.e(
         'Error occurred during the Dropbox connect process. Clearing credentials.',
         error: error,
         stackTrace: stackTrace,
       );
-      await provider.logout();
-      return null;
+      rethrow;
     }
   }
 
@@ -380,9 +378,18 @@ class DropboxProvider extends CloudStorageProvider {
     _checkAuth();
     try {
       return await request();
+    }  on SocketException catch (e, stackTrace) {
+      logger.w('No connection detected.', error: e, stackTrace: stackTrace);
+      throw NoConnectionException(e.message);
     } on DioException catch (e, stackTrace) {
       logger.e('A DioException occurred in Dropbox request',
           error: e, stackTrace: stackTrace);
+      if (e.error is SocketException) {
+        throw NoConnectionException(e.message ?? e.toString());
+      }
+      if (e.response?.statusCode == 409) {
+        throw NotFoundException(e.message ?? e.toString());
+      }
       if (e.response?.statusCode == 401) {
         logger
             .w('Dropbox request failed with 401. Possible token invalidation.');

@@ -6,10 +6,12 @@ import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:googleapis_auth/googleapis_auth.dart';
 import 'package:http/retry.dart';
 import 'package:logger/logger.dart';
+import 'package:multi_cloud_storage/exceptions/no_connection_exception.dart';
 import 'package:path/path.dart';
 
 // Assuming your global logger is accessible via main.dart
 import 'cloud_storage_provider.dart';
+import 'exceptions/not_found_exception.dart';
 import 'file_log_output.dart';
 import 'multi_cloud_storage.dart';
 
@@ -52,6 +54,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
     if (_instance != null && _instance!._isAuthenticated && !forceInteractive) {
       return _instance;
     }
+    try {
     // Initialize GoogleSignIn with the correct scope based on the desired cloud access level.
     _googleSignIn ??= GoogleSignIn(
       scopes: [
@@ -62,7 +65,6 @@ class GoogleDriveProvider extends CloudStorageProvider {
       ],
     );
     GoogleSignInAccount? account;
-    try {
       // Attempt silent sign-in first to avoid unnecessary user interaction.
       if (!forceInteractive) {
         account = await _googleSignIn!.signInSilently();
@@ -105,6 +107,10 @@ class GoogleDriveProvider extends CloudStorageProvider {
       logger.i(
           'Google Drive user signed in: ID=${account.id}, Email=${account.email}');
       return _instance;
+    }  on SocketException catch (e, stackTrace) {
+      logger.w('No internet connection during Google Drive sign-in.',
+          error: e, stackTrace: stackTrace);
+      throw NoConnectionException(e.message);
     } catch (error, stackTrace) {
       logger.e(
         'Error occurred during the Google Drive connect process.',
@@ -426,13 +432,19 @@ class GoogleDriveProvider extends CloudStorageProvider {
       // If the error is an auth token issue, try to recover.
       if (e.status == 401 || e.status == 403) {
         return _handleAuthErrorAndRetry(request, e, stackTrace);
+      } else if (e.status == 404) {
+        throw NotFoundException(e.message ?? '');
+      } else {
+        // For other API errors, rethrow them.
+        rethrow;
       }
-      // For other API errors, rethrow them.
-      rethrow;
     } on AccessDeniedException catch (e, stackTrace) {
       // Also handle auth errors from the underlying auth library.
       return _handleAuthErrorAndRetry(request, e, stackTrace);
-    }
+    } on SocketException catch (e, stackTrace) {
+  logger.w('No connection detected.', error: e, stackTrace: stackTrace);
+  throw NoConnectionException(e.message);
+}
   }
 
   /// Throws an exception if the provider is not authenticated.
