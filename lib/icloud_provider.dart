@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:icloud_storage_sync/icloud_storage_sync.dart';
-import 'package:icloud_storage_sync/models/exceptions.dart';
 import 'package:icloud_storage_sync/models/icloud_file.dart';
 import 'package:path/path.dart' as p;
 
@@ -207,7 +206,7 @@ class ICloudStorageProvider extends CloudStorageProvider {
 
   @override
   Future<String?> getShareTokenFromShareLink(Uri shareLink) async {
-    return null;  // The package does not support sharing.
+    return null; // The package does not support sharing.
   }
 
   /// Removes a leading slash from a path, as the iCloud package requires it.
