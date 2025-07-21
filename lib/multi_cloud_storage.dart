@@ -26,7 +26,7 @@ class MultiCloudStorage {
 
   static Future<CloudStorageProvider?> connectToIcloud(
           {required String containerId}) =>
-      ICloudStorageProvider.connect(containerId: containerId);
+      ICloudProvider.connect(containerId: containerId);
 
   static Future<CloudStorageProvider?> connectToOneDrive({
     required String clientId,

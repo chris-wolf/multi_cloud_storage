@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -7,24 +8,25 @@ import 'package:icloud_storage_sync/models/icloud_file.dart';
 import 'package:path/path.dart' as p;
 
 import 'cloud_storage_provider.dart';
+import 'exceptions/no_connection_exception.dart';
 import 'exceptions/not_found_exception.dart';
 
-class ICloudStorageProvider extends CloudStorageProvider {
+class ICloudProvider extends CloudStorageProvider {
   late final IcloudStorageSync _icloudSync;
   late final String _containerId;
-  static ICloudStorageProvider? _instance;
+  static ICloudProvider? _instance;
 
-  ICloudStorageProvider._create(this._containerId) {
+  ICloudProvider._create(this._containerId) {
     _icloudSync = IcloudStorageSync();
   }
 
   /// Establishes a connection to iCloud storage.
   ///
-  /// On success, returns a singleton instance of [ICloudStorageProvider].
+  /// On success, returns a singleton instance of [ICloudProvider].
   ///
   /// This method requires the iCloud [containerId] specific to your app.
   /// It will throw an [UnsupportedError] if called on a non-iOS platform.
-  static Future<ICloudStorageProvider?> connect(
+  static Future<ICloudProvider?> connect(
       {required String containerId}) async {
     // iCloud is only available on iOS.
     if (Platform.isIOS == false && Platform.isMacOS == false) {
@@ -32,7 +34,7 @@ class ICloudStorageProvider extends CloudStorageProvider {
       throw UnsupportedError(
           'iCloud Storage is only available on iOS and MacOs.');
     }
-    _instance ??= ICloudStorageProvider._create(containerId);
+    _instance ??= ICloudProvider._create(containerId);
     return _instance;
   }
 
@@ -75,24 +77,67 @@ class ICloudStorageProvider extends CloudStorageProvider {
     required String remotePath,
     required String localPath,
   }) async {
+    final completer = Completer<String>();
+    StreamSubscription? progressSubscription;
     try {
       await _icloudSync.download(
         containerId: _containerId,
         relativePath: _sanitizePath(remotePath),
         destinationFilePath: localPath,
+        onProgress: (stream) {
+          // This listener is now for in-progress updates and potential mid-stream errors.
+          progressSubscription = stream.listen(
+                (progress) {
+              // You can handle progress updates here if needed.
+              debugPrint('Download progress: $progress');
+            },
+            onError: (error) {
+              // This handles errors that might occur *during* the download stream.
+              if (!completer.isCompleted) {
+                // You can still keep your original checks here as a fallback.
+                if (error is PlatformException && error.toString().contains('NSURLErrorDomain Code=-1009')) {
+                  completer.completeError(NoConnectionException(error.toString()));
+                } else if (error.toString().contains('NSCocoaErrorDomain Code=4')) {
+                  completer.completeError(NotFoundException(error.toString()));
+                } else {
+                  completer.completeError(Exception('iCloud download failed during stream: $error'));
+                }
+              }
+            },
+            onDone: () {
+              if (!completer.isCompleted) {
+                completer.complete(localPath);
+              }
+            },
+            cancelOnError: true,
+          );
+        },
       );
-      return localPath;
+      // If the download call completes without an error but the completer is still not done,
+      // it means we are waiting for the onDone callback from the stream.
     } on PlatformException catch (e) {
-      // Check for the specific "File Not Found" error from the native iOS/macOS side.
-      // NSCocoaErrorDomain code 4 is the standard file-not-found error.
-      if (e.toString().contains('NSCocoaErrorDomain Code=4')) {
-        // Convert the platform-specific error into our abstract NotFoundException
-        throw NotFoundException(
-          'File not found in iCloud at path: $remotePath. Original error: ${e.toString()}',
-        );
+      // **FIX:** Handle initial errors, like "file not found", here.
+      if (!completer.isCompleted) {
+        if (e.toString().contains('NSCocoaErrorDomain Code=4')) {
+          completer.completeError(NotFoundException('File not found at path: $remotePath'));
+        } else if (e.toString().contains('NSURLErrorDomain Code=-1009')) {
+          completer.completeError(NoConnectionException('Failed to download from iCloud. Check your internet connection.'));
+        } else {
+          completer.completeError(e); // Rethrow other platform exceptions.
+        }
       }
-      // For any other platform exceptions, rethrow them as they are unexpected.
-      rethrow;
+    } catch (e) {
+      // Catch any other general exceptions.
+      if (!completer.isCompleted) {
+        completer.completeError(e);
+      }
+    }
+
+    try {
+      return await completer.future;
+    } finally {
+      // Ensure the subscription is cancelled to prevent memory leaks.
+      await progressSubscription?.cancel();
     }
   }
 
@@ -101,15 +146,22 @@ class ICloudStorageProvider extends CloudStorageProvider {
   Future<String> uploadFile({
     required String localPath,
     required String remotePath,
-    Map<String, dynamic>? metadata, // Note: iCloud metadata is not supported.
+    Map<String, dynamic>? metadata,
   }) async {
-    await _icloudSync.upload(
-      containerId: _containerId,
-      filePath: localPath,
-      destinationRelativePath: _sanitizePath(remotePath),
-    );
-    // For iCloud, the path acts as the identifier.
-    return remotePath;
+    try {
+      await _icloudSync.upload(
+        containerId: _containerId,
+        filePath: localPath,
+        destinationRelativePath: _sanitizePath(remotePath),
+      );
+      return remotePath;
+    } on PlatformException catch (e) {
+      // ADD THIS CHECK: for "No Connection" (NSURLErrorDomain Code -1009)
+      if (e.code == '-1009' || e.toString().contains('NSURLErrorDomain Code=-1009')) {
+        throw NoConnectionException('Failed to upload to iCloud. Please check your internet connection.');
+      }
+      rethrow;
+    }
   }
 
   /// Deletes the file or directory at the specified [path].
