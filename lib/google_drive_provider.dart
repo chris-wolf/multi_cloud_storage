@@ -56,16 +56,16 @@ class GoogleDriveProvider extends CloudStorageProvider {
       return _instance;
     }
     try {
-    // Initialize GoogleSignIn with the correct scope based on the desired cloud access level.
-    _googleSignIn ??= GoogleSignIn(
-      scopes: [
-        MultiCloudStorage.cloudAccess == CloudAccessType.appStorage
-            ? drive.DriveApi
-                .driveAppdataScope // Access to the app-specific folder.
-            : drive.DriveApi.driveScope, // Full access to user's Drive.
-      ],
-    );
-    GoogleSignInAccount? account;
+      // Initialize GoogleSignIn with the correct scope based on the desired cloud access level.
+      _googleSignIn ??= GoogleSignIn(
+        scopes: [
+          MultiCloudStorage.cloudAccess == CloudAccessType.appStorage
+              ? drive.DriveApi
+                  .driveAppdataScope // Access to the app-specific folder.
+              : drive.DriveApi.driveScope, // Full access to user's Drive.
+        ],
+      );
+      GoogleSignInAccount? account;
       // Attempt silent sign-in first to avoid unnecessary user interaction.
       if (!forceInteractive) {
         account = await _googleSignIn!.signInSilently();
@@ -108,7 +108,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
       logger.i(
           'Google Drive user signed in: ID=${account.id}, Email=${account.email}');
       return _instance;
-    }  on SocketException catch (e, stackTrace) {
+    } on SocketException catch (e, stackTrace) {
       logger.w('No internet connection during Google Drive sign-in.',
           error: e, stackTrace: stackTrace);
       throw NoConnectionException(e.message);
@@ -446,9 +446,15 @@ class GoogleDriveProvider extends CloudStorageProvider {
       // Also handle auth errors from the underlying auth library.
       return _handleAuthErrorAndRetry(request, e, stackTrace);
     } on SocketException catch (e, stackTrace) {
-  logger.w('No connection detected.', error: e, stackTrace: stackTrace);
-  throw NoConnectionException(e.message);
-}
+      logger.w('No connection detected.', error: e, stackTrace: stackTrace);
+      throw NoConnectionException(e.message);
+    } on Exception catch (e) {
+      // Catch any other generic exception that matches the message
+      if (e.toString().contains('File not found')) {
+        throw NotFoundException(e.toString());
+      }
+      rethrow;
+    }
   }
 
   /// Throws an exception if the provider is not authenticated.
