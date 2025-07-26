@@ -7,7 +7,6 @@ import 'package:flutter_onedrive/token.dart';
 import 'package:http/http.dart' as http;
 import 'cloud_storage_provider.dart';
 import 'exceptions/no_connection_exception.dart';
-import 'file_log_output.dart';
 import 'multi_cloud_storage.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -57,24 +56,23 @@ class OneDriveProvider extends CloudStorageProvider {
       // 1. First, attempt to connect silently using a stored token.
       if (await provider.client.isConnected()) {
             provider._isAuthenticated = true;
-            logger.i("OneDriveProvider: Silently connected successfully.");
+            debugPrint("OneDriveProvider: Silently connected successfully.");
             return provider;
           }
       // 2. If silent connection fails, fall back to interactive login via a WebView.
-      logger
-              .i("OneDriveProvider: Not connected, attempting interactive login...");
+      debugPrint("OneDriveProvider: Not connected, attempting interactive login...");
       if (await provider.client.connect(context) == false) {
-            logger.i("OneDriveProvider: Interactive login failed or was cancelled.");
+            debugPrint("OneDriveProvider: Interactive login failed or was cancelled.");
             return null; // User cancelled or login failed.
           }
       provider._isAuthenticated = true;
-      logger.i("OneDriveProvider: Interactive login successful.");
+      debugPrint("OneDriveProvider: Interactive login successful.");
       return provider;
-    } on SocketException catch (e, stackTrace) {
-      logger.w('No connection detected.', error: e, stackTrace: stackTrace);
+    } on SocketException catch (e) {
+      debugPrint('No connection detected.');
       throw NoConnectionException(e.message);
-    }  catch (e, stackTrace) {
-      logger.w('Exception', error: e, stackTrace: stackTrace);
+    }  catch (e) {
+      debugPrint('Exception ${e.toString()}');
       rethrow;
     }
   }
@@ -255,7 +253,7 @@ class OneDriveProvider extends CloudStorageProvider {
   /// Logs out the current user from the cloud service.
   @override
   Future<bool> logout() async {
-    logger.i("Logging out from OneDrive...");
+    debugPrint("Logging out from OneDrive...");
     final cookieManager = CookieManager.instance();
     if (_isAuthenticated) {
       try {
@@ -264,17 +262,16 @@ class OneDriveProvider extends CloudStorageProvider {
         _isAuthenticated = false;
         // 2. Clear all WebView cookies to ensure a fresh login prompt on the next connect attempt.
         await cookieManager.deleteAllCookies();
-        logger.i("OneDrive logout successful and web cookies cleared.");
+        debugPrint("OneDrive logout successful and web cookies cleared.");
         return true;
-      } catch (error, stackTrace) {
-        logger.e("Error during OneDrive logout.",
-            error: error, stackTrace: stackTrace);
+      } catch (error) {
+        debugPrint("Error during OneDrive logout.",);
         return false;
       }
     }
     // Ensure cookies are cleared even if the client was already disconnected.
     await cookieManager.deleteAllCookies();
-    logger.d("Already logged out from OneDrive, ensuring cookies are cleared.");
+    debugPrint("Already logged out from OneDrive, ensuring cookies are cleared.");
     return false;
   }
 
@@ -285,7 +282,7 @@ class OneDriveProvider extends CloudStorageProvider {
       () async {
         final accessToken = await _getAccessToken();
         if (accessToken.isEmpty) {
-          logger.w(
+          debugPrint(
               "OneDriveProvider: No access token available for generating share link.");
           return null;
         }
@@ -306,7 +303,7 @@ class OneDriveProvider extends CloudStorageProvider {
           }), // Request an editable, public link.
         );
         if (response.statusCode != 200 && response.statusCode != 201) {
-          logger.e(
+          debugPrint(
               "Failed to create shareable link. Status: ${response.statusCode}, Body: ${response.body}");
           return null;
         }
@@ -340,19 +337,19 @@ class OneDriveProvider extends CloudStorageProvider {
     // Append `?download=1` to the share link to hint at a direct download.
     final initialUrl =
         Uri.parse(shareToken).replace(queryParameters: {'download': '1'});
-    logger.i("Starting headless WebView to resolve download for: $initialUrl");
+    debugPrint("Starting headless WebView to resolve download for: $initialUrl");
     headlessWebView = HeadlessInAppWebView(
         initialUrlRequest: URLRequest(url: WebUri.uri(initialUrl)),
         // This callback captures the final download URL after all redirects.
         onDownloadStartRequest: (controller, downloadStartRequest) async {
           final finalUrl = downloadStartRequest.url.toString();
-          logger.i("WebView captured final download URL: $finalUrl");
+          debugPrint("WebView captured final download URL: $finalUrl");
           if (!completer.isCompleted) {
             completer.complete(finalUrl);
           }
         },
         onLoadError: (controller, url, code, message) {
-          logger.e("WebView error: Code $code, Message: $message");
+          debugPrint("WebView error: Code $code, Message: $message");
           if (!completer.isCompleted) {
             completer.completeError(Exception("WebView error: $message"));
           }
@@ -378,7 +375,7 @@ class OneDriveProvider extends CloudStorageProvider {
       final dio = Dio();
       // This interceptor will attach the cookies gathered by the WebView to the Dio request.
       dio.interceptors.add(WebViewCookieInterceptor());
-      logger.i("Downloading with Dio using WebView cookies and Referer.");
+      debugPrint("Downloading with Dio using WebView cookies and Referer.");
       await dio.download(
         finalDownloadUrl,
         localPath,
@@ -391,11 +388,10 @@ class OneDriveProvider extends CloudStorageProvider {
           },
         ),
       );
-      logger.i("File successfully downloaded to $localPath");
+      debugPrint("File successfully downloaded to $localPath");
       return localPath;
     } catch (e, stackTrace) {
-      logger.e("Error during WebView download process",
-          error: e, stackTrace: stackTrace);
+      debugPrint("Error during WebView download process");
       await headlessWebView.dispose();
       rethrow;
     }
@@ -434,7 +430,7 @@ class OneDriveProvider extends CloudStorageProvider {
         // A 200 or 201 status indicates a successful upload.
         if (uploadResponse.statusCode >= 200 &&
             uploadResponse.statusCode < 300) {
-          logger.i('Successfully uploaded file to shared URL location.');
+          debugPrint('Successfully uploaded file to shared URL location.');
           return shareToken; // Return the original token on success.
         } else {
           throw Exception(
@@ -454,22 +450,19 @@ class OneDriveProvider extends CloudStorageProvider {
   }) async {
     _checkAuth();
     try {
-      logger.d('Executing OneDrive operation: $operation');
+      debugPrint('Executing OneDrive operation: $operation');
       return await request();
     }  on SocketException catch (e, stackTrace) {
-      logger.w('No connection detected.', error: e, stackTrace: stackTrace);
+      debugPrint('No connection detected.');
       throw NoConnectionException(e.message);
     }catch (e, stackTrace) {
-      logger.e(
-        'Error during OneDrive operation: $operation',
-        error: e,
-        stackTrace: stackTrace,
-      );
+      debugPrint(
+        'Error during OneDrive operation: $operation');
       // If a 401 Unauthorized or invalid_grant error occurs, the token is likely expired.
       if (e.toString().contains('401') ||
           e.toString().contains('invalid_grant')) {
         _isAuthenticated = false;
-        logger.w(
+        debugPrint(
             'OneDrive token appears to be expired. User re-authentication is required.');
       }
       rethrow; // Rethrow the error to be handled by the calling function.
@@ -521,7 +514,7 @@ class OneDriveProvider extends CloudStorageProvider {
           'redeemSharingLink', // Special header to process the share link.
     });
     if (response.statusCode != 200) {
-      logger.e(
+      debugPrint(
           'Failed to resolve share URL. Status: ${response.statusCode}, Body: ${response.body}');
       return null;
     }
@@ -531,7 +524,7 @@ class OneDriveProvider extends CloudStorageProvider {
     if (remoteItem != null &&
         remoteItem['id'] != null &&
         remoteItem['driveId'] != null) {
-      logger.i("Resolved a remote item from another drive.");
+      debugPrint("Resolved a remote item from another drive.");
       return _ResolvedShareInfo(
           driveId: remoteItem['driveId'], itemId: remoteItem['id']);
     }
@@ -539,11 +532,11 @@ class OneDriveProvider extends CloudStorageProvider {
     final String? itemId = json['id'];
     final String? driveId = json['parentReference']?['driveId'];
     if (itemId == null || driveId == null) {
-      logger.e(
+      debugPrint(
           'Could not extract driveId and itemId from resolved share response. Body: ${response.body}');
       return null;
     }
-    logger.i("Resolved an item from the user's own drive.");
+    debugPrint("Resolved an item from the user's own drive.");
     return _ResolvedShareInfo(driveId: driveId, itemId: itemId);
   }
 

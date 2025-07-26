@@ -1,34 +1,18 @@
 import 'dart:io';
 
 import 'package:extension_google_sign_in_as_googleapis_auth/extension_google_sign_in_as_googleapis_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:googleapis_auth/googleapis_auth.dart';
 import 'package:http/retry.dart';
-import 'package:logger/logger.dart';
 import 'package:multi_cloud_storage/exceptions/no_connection_exception.dart';
 import 'package:path/path.dart';
-
-// Assuming your global logger is accessible via main.dart
 import 'cloud_storage_provider.dart';
 import 'exceptions/not_found_exception.dart';
-import 'file_log_output.dart';
 import 'multi_cloud_storage.dart';
 
-// 3. The Logger Instance: Your global logger object
-final logger = Logger(
-  filter: MyFilter(), // Use your custom filter
-  output: MultiOutput([
-    ConsoleOutput(),
-    FileLogOutput(),
-  ]),
-  printer: PrettyPrinter(
-    methodCount: 0,
-    colors: false, // Set to false for file output
-    printTime: true,
-  ),
-);
 
 class GoogleDriveProvider extends CloudStorageProvider {
   /// The authenticated Google Drive API client.
@@ -50,7 +34,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
   /// Returns a connected [GoogleDriveProvider] instance on success, or null on failure/cancellation.
   static Future<GoogleDriveProvider?> connect(
       {bool forceInteractive = false}) async {
-    logger.i("connect Google Drive,  forceInteractive: $forceInteractive");
+    debugPrint("connect Google Drive,  forceInteractive: $forceInteractive");
     // Return existing instance if already connected and not forcing a new interactive session.
     if (_instance != null && _instance!._isAuthenticated && !forceInteractive) {
       return _instance;
@@ -73,21 +57,21 @@ class GoogleDriveProvider extends CloudStorageProvider {
       // If silent sign-in fails or is skipped, start the interactive sign-in flow.
       account ??= await _googleSignIn!.signIn();
       if (account == null) {
-        logger.i('User cancelled Google Sign-In process.');
+        debugPrint('User cancelled Google Sign-In process.');
         return null;
       }
       // Ensure the user has granted the required permissions.
       final bool hasPermissions =
           await _googleSignIn!.requestScopes(_googleSignIn!.scopes);
       if (!hasPermissions) {
-        logger.w('User did not grant necessary Google Drive permissions.');
+        debugPrint('User did not grant necessary Google Drive permissions.');
         await signOut();
         return null;
       }
       // Get the authenticated HTTP client.
       final client = await _googleSignIn!.authenticatedClient();
       if (client == null) {
-        logger.e(
+        debugPrint(
             'Failed to get authenticated Google client after permissions were granted.');
         await signOut();
         return null;
@@ -98,26 +82,22 @@ class GoogleDriveProvider extends CloudStorageProvider {
         retries: 3,
         when: (response) => {500, 502, 503, 504}.contains(response.statusCode),
         onRetry: (request, response, retryCount) =>
-            logger.d('Retrying request to ${request.url} (Retry #$retryCount)'),
+            debugPrint('Retrying request to ${request.url} (Retry #$retryCount)'),
       );
       // Create or update the singleton instance with the authenticated client.
       final provider = _instance ?? GoogleDriveProvider._create();
       provider.driveApi = drive.DriveApi(retryClient);
       provider._isAuthenticated = true;
       _instance = provider;
-      logger.i(
+      debugPrint(
           'Google Drive user signed in: ID=${account.id}, Email=${account.email}');
       return _instance;
     } on SocketException catch (e, stackTrace) {
-      logger.w('No internet connection during Google Drive sign-in.',
-          error: e, stackTrace: stackTrace);
+      debugPrint('No internet connection during Google Drive sign-in.');
       throw NoConnectionException(e.message);
-    } catch (error, stackTrace) {
-      logger.e(
-        'Error occurred during the Google Drive connect process.',
-        error: error,
-        stackTrace: stackTrace,
-      );
+    } catch (error) {
+      debugPrint(
+        'Error occurred during the Google Drive connect process.',);
       if (error is PlatformException && error.code == 'network_error') {
         throw NoConnectionException(error.toString());
       }
@@ -407,12 +387,8 @@ class GoogleDriveProvider extends CloudStorageProvider {
     try {
       await _googleSignIn?.disconnect();
       await _googleSignIn?.signOut();
-    } catch (error, stackTrace) {
-      logger.e(
-        'Failed to sign out or disconnect from Google.',
-        error: error,
-        stackTrace: stackTrace,
-      );
+    } catch (error) {
+      debugPrint('Failed to sign out or disconnect from Google.');
     } finally {
       // Clear all state regardless of success or failure.
       _googleSignIn = null;
@@ -420,7 +396,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
         _instance!._isAuthenticated = false;
         _instance = null;
       }
-      logger.i('User signed out from Google Drive.');
+      debugPrint('User signed out from Google Drive.');
     }
   }
 
@@ -446,7 +422,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
       // Also handle auth errors from the underlying auth library.
       return _handleAuthErrorAndRetry(request, e, stackTrace);
     } on SocketException catch (e, stackTrace) {
-      logger.w('No connection detected.', error: e, stackTrace: stackTrace);
+      debugPrint('No connection detected.');
       throw NoConnectionException(e.message);
     } on Exception catch (e) {
       // Catch any other generic exception that matches the message
@@ -472,18 +448,16 @@ class GoogleDriveProvider extends CloudStorageProvider {
   /// original function `request`.
   Future<T> _handleAuthErrorAndRetry<T>(
       Future<T> Function() request, Object error, StackTrace stackTrace) async {
-    logger.w('Authentication error occurred. Attempting to reconnect...',
-        error: error, stackTrace: stackTrace);
+    debugPrint('Authentication error occurred. Attempting to reconnect...');
     _isAuthenticated = false;
     // Silently try to reconnect to refresh the auth token.
     final reconnectedProvider = await GoogleDriveProvider.connect();
     if (reconnectedProvider != null && reconnectedProvider._isAuthenticated) {
-      logger.i('Successfully reconnected. Retrying the original request.');
+      debugPrint('Successfully reconnected. Retrying the original request.');
       // Retry the original request closure.
       return await request();
     } else {
-      logger
-          .e('Failed to reconnect after auth error. Throwing original error.');
+      debugPrint('Failed to reconnect after auth error. Throwing original error.');
       // If reconnection fails, rethrow the original error to the caller.
       throw error;
     }

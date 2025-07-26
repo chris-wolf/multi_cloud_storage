@@ -22,8 +22,6 @@ dependencies:
   crypto: ^3.0.6
   app_links: ^6.4.0
   flutter_secure_storage: ^9.2.4
-  sentry_flutter: ^9.5.0
-  logger: ^2.6.1
   icloud_storage_sync: ^0.0.2
   dio_cookie_manager: ^3.2.0
   cookie_jar: ^4.0.8
