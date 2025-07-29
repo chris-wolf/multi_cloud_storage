@@ -22,6 +22,12 @@ class GoogleDriveProvider extends CloudStorageProvider {
   // Singleton instance backing fields.
   static GoogleSignIn? _googleSignIn;
   static GoogleDriveProvider? _instance;
+  static List<String> _scopes = [
+    MultiCloudStorage.cloudAccess == CloudAccessType.appStorage
+        ? drive.DriveApi
+        .driveAppdataScope // Access to the app-specific folder.
+        : drive.DriveApi.driveScope, // Full access to user's Drive.
+  ];
 
   GoogleDriveProvider._create();
 
@@ -41,15 +47,13 @@ class GoogleDriveProvider extends CloudStorageProvider {
     if (_instance != null && _instance!._isAuthenticated && !forceInteractive) {
       return _instance;
     }
+    if (scopes != null) {
+      _scopes = scopes;
+    }
     try {
       // Initialize GoogleSignIn with the correct scope based on the desired cloud access level.
       _googleSignIn ??= GoogleSignIn(
-        scopes: scopes ?? [
-          MultiCloudStorage.cloudAccess == CloudAccessType.appStorage
-              ? drive.DriveApi
-                  .driveAppdataScope // Access to the app-specific folder.
-              : drive.DriveApi.driveScope, // Full access to user's Drive.
-        ],
+        scopes: _scopes,
       );
       GoogleSignInAccount? account;
       // Attempt silent sign-in first to avoid unnecessary user interaction.
@@ -64,7 +68,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
       }
       // Ensure the user has granted the required permissions.
       final bool hasPermissions =
-          await _googleSignIn!.requestScopes(_googleSignIn!.scopes);
+          await _googleSignIn!.requestScopes(_scopes);
       if (!hasPermissions) {
         debugPrint('User did not grant necessary Google Drive permissions.');
         await signOut();
