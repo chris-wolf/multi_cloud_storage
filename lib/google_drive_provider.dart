@@ -33,7 +33,9 @@ class GoogleDriveProvider extends CloudStorageProvider {
   /// silently first, unless [forceInteractive] is true.
   /// Returns a connected [GoogleDriveProvider] instance on success, or null on failure/cancellation.
   static Future<GoogleDriveProvider?> connect(
-      {bool forceInteractive = false}) async {
+      {bool forceInteractive = false,
+        List<String>? scopes
+      }) async {
     debugPrint("connect Google Drive,  forceInteractive: $forceInteractive");
     // Return existing instance if already connected and not forcing a new interactive session.
     if (_instance != null && _instance!._isAuthenticated && !forceInteractive) {
@@ -42,7 +44,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
     try {
       // Initialize GoogleSignIn with the correct scope based on the desired cloud access level.
       _googleSignIn ??= GoogleSignIn(
-        scopes: [
+        scopes: scopes ?? [
           MultiCloudStorage.cloudAccess == CloudAccessType.appStorage
               ? drive.DriveApi
                   .driveAppdataScope // Access to the app-specific folder.
