@@ -5,5 +5,6 @@ class NoConnectionException implements Exception {
   NoConnectionException(this.message, {this.resourceId});
 
   @override
-  String toString() => 'NoConnectionException: $message (resourceId: $resourceId)';
+  String toString() =>
+      'NoConnectionException: $message (resourceId: $resourceId)';
 }

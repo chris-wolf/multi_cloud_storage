@@ -21,8 +21,13 @@ class MultiCloudStorage {
           forceInteractive: forceInteractive);
 
   static Future<CloudStorageProvider?> connectToGoogleDrive(
-          {bool forceInteractive = false, List<String>? scopes, String? serverClientId}) =>
-      GoogleDriveProvider.connect(forceInteractive: forceInteractive, scopes: scopes, serverClientId: serverClientId);
+          {bool forceInteractive = false,
+          List<String>? scopes,
+          String? serverClientId}) =>
+      GoogleDriveProvider.connect(
+          forceInteractive: forceInteractive,
+          scopes: scopes,
+          serverClientId: serverClientId);
 
   static Future<CloudStorageProvider?> connectToIcloud(
           {required String containerId}) =>

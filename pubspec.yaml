@@ -28,6 +28,7 @@ dependencies:
 
   path_provider: any
   googleapis_auth: any
+  flutter_inappwebview: any
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -26,8 +26,7 @@ class ICloudProvider extends CloudStorageProvider {
   ///
   /// This method requires the iCloud [containerId] specific to your app.
   /// It will throw an [UnsupportedError] if called on a non-iOS platform.
-  static Future<ICloudProvider?> connect(
-      {required String containerId}) async {
+  static Future<ICloudProvider?> connect({required String containerId}) async {
     // iCloud is only available on iOS.
     if (Platform.isIOS == false && Platform.isMacOS == false) {
       debugPrint('iCloud Storage is only available on iOS and.');
@@ -87,7 +86,7 @@ class ICloudProvider extends CloudStorageProvider {
         onProgress: (stream) {
           // This listener is now for in-progress updates and potential mid-stream errors.
           progressSubscription = stream.listen(
-                (progress) {
+            (progress) {
               // You can handle progress updates here if needed.
               debugPrint('Download progress: $progress');
             },
@@ -95,12 +94,17 @@ class ICloudProvider extends CloudStorageProvider {
               // This handles errors that might occur *during* the download stream.
               if (!completer.isCompleted) {
                 // You can still keep your original checks here as a fallback.
-                if (error is PlatformException && error.toString().contains('NSURLErrorDomain Code=-1009')) {
-                  completer.completeError(NoConnectionException(error.toString()));
-                } else if (error.toString().contains('NSCocoaErrorDomain Code=4')) {
+                if (error is PlatformException &&
+                    error.toString().contains('NSURLErrorDomain Code=-1009')) {
+                  completer
+                      .completeError(NoConnectionException(error.toString()));
+                } else if (error
+                    .toString()
+                    .contains('NSCocoaErrorDomain Code=4')) {
                   completer.completeError(NotFoundException(error.toString()));
                 } else {
-                  completer.completeError(Exception('iCloud download failed during stream: $error'));
+                  completer.completeError(Exception(
+                      'iCloud download failed during stream: $error'));
                 }
               }
             },
@@ -119,9 +123,11 @@ class ICloudProvider extends CloudStorageProvider {
       // **FIX:** Handle initial errors, like "file not found", here.
       if (!completer.isCompleted) {
         if (e.toString().contains('NSCocoaErrorDomain Code=4')) {
-          completer.completeError(NotFoundException('File not found at path: $remotePath'));
+          completer.completeError(
+              NotFoundException('File not found at path: $remotePath'));
         } else if (e.toString().contains('NSURLErrorDomain Code=-1009')) {
-          completer.completeError(NoConnectionException('Failed to download from iCloud. Check your internet connection.'));
+          completer.completeError(NoConnectionException(
+              'Failed to download from iCloud. Check your internet connection.'));
         } else {
           completer.completeError(e); // Rethrow other platform exceptions.
         }
@@ -157,8 +163,10 @@ class ICloudProvider extends CloudStorageProvider {
       return remotePath;
     } on PlatformException catch (e) {
       // ADD THIS CHECK: for "No Connection" (NSURLErrorDomain Code -1009)
-      if (e.code == '-1009' || e.toString().contains('NSURLErrorDomain Code=-1009')) {
-        throw NoConnectionException('Failed to upload to iCloud. Please check your internet connection.');
+      if (e.code == '-1009' ||
+          e.toString().contains('NSURLErrorDomain Code=-1009')) {
+        throw NoConnectionException(
+            'Failed to upload to iCloud. Please check your internet connection.');
       }
       rethrow;
     }

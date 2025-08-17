@@ -45,33 +45,35 @@ class OneDriveProvider extends CloudStorageProvider {
     }
     try {
       final provider = OneDriveProvider._create(
-              clientId: clientId, redirectUri: redirectUri, context: context);
+          clientId: clientId, redirectUri: redirectUri, context: context);
       // Configure the client with appropriate scopes based on the desired access level.
       provider.client = OneDrive(
-            clientID: clientId,
-            redirectURL: redirectUri,
-            scopes: scopes ??
-                "${MultiCloudStorage.cloudAccess == CloudAccessType.appStorage ? OneDrive.permissionFilesReadWriteAppFolder : OneDrive.permissionFilesReadWriteAll} offline_access User.Read Sites.ReadWrite.All",
-          );
+        clientID: clientId,
+        redirectURL: redirectUri,
+        scopes: scopes ??
+            "${MultiCloudStorage.cloudAccess == CloudAccessType.appStorage ? OneDrive.permissionFilesReadWriteAppFolder : OneDrive.permissionFilesReadWriteAll} offline_access User.Read Sites.ReadWrite.All",
+      );
       // 1. First, attempt to connect silently using a stored token.
       if (await provider.client.isConnected()) {
-            provider._isAuthenticated = true;
-            debugPrint("OneDriveProvider: Silently connected successfully.");
-            return provider;
-          }
+        provider._isAuthenticated = true;
+        debugPrint("OneDriveProvider: Silently connected successfully.");
+        return provider;
+      }
       // 2. If silent connection fails, fall back to interactive login via a WebView.
-      debugPrint("OneDriveProvider: Not connected, attempting interactive login...");
+      debugPrint(
+          "OneDriveProvider: Not connected, attempting interactive login...");
       if (await provider.client.connect(context) == false) {
-            debugPrint("OneDriveProvider: Interactive login failed or was cancelled.");
-            return null; // User cancelled or login failed.
-          }
+        debugPrint(
+            "OneDriveProvider: Interactive login failed or was cancelled.");
+        return null; // User cancelled or login failed.
+      }
       provider._isAuthenticated = true;
       debugPrint("OneDriveProvider: Interactive login successful.");
       return provider;
     } on SocketException catch (e) {
       debugPrint('No connection detected.');
       throw NoConnectionException(e.message);
-    }  catch (e) {
+    } catch (e) {
       debugPrint('Exception ${e.toString()}');
       rethrow;
     }
@@ -165,7 +167,7 @@ class OneDriveProvider extends CloudStorageProvider {
       () async {
         final response = await client.deleteFile(path,
             isAppFolder:
-            MultiCloudStorage.cloudAccess == CloudAccessType.appStorage);
+                MultiCloudStorage.cloudAccess == CloudAccessType.appStorage);
         if (response.message?.contains('SocketException') ?? false) {
           throw NoConnectionException(response.message ?? response.toString());
         }
@@ -181,7 +183,7 @@ class OneDriveProvider extends CloudStorageProvider {
       () async {
         final response = await client.createDirectory(path,
             isAppFolder:
-            MultiCloudStorage.cloudAccess == CloudAccessType.appStorage);
+                MultiCloudStorage.cloudAccess == CloudAccessType.appStorage);
         if (response.message?.contains('SocketException') ?? false) {
           throw NoConnectionException(response.message ?? response.toString());
         }
@@ -265,13 +267,16 @@ class OneDriveProvider extends CloudStorageProvider {
         debugPrint("OneDrive logout successful and web cookies cleared.");
         return true;
       } catch (error) {
-        debugPrint("Error during OneDrive logout.",);
+        debugPrint(
+          "Error during OneDrive logout.",
+        );
         return false;
       }
     }
     // Ensure cookies are cleared even if the client was already disconnected.
     await cookieManager.deleteAllCookies();
-    debugPrint("Already logged out from OneDrive, ensuring cookies are cleared.");
+    debugPrint(
+        "Already logged out from OneDrive, ensuring cookies are cleared.");
     return false;
   }
 
@@ -337,7 +342,8 @@ class OneDriveProvider extends CloudStorageProvider {
     // Append `?download=1` to the share link to hint at a direct download.
     final initialUrl =
         Uri.parse(shareToken).replace(queryParameters: {'download': '1'});
-    debugPrint("Starting headless WebView to resolve download for: $initialUrl");
+    debugPrint(
+        "Starting headless WebView to resolve download for: $initialUrl");
     headlessWebView = HeadlessInAppWebView(
         initialUrlRequest: URLRequest(url: WebUri.uri(initialUrl)),
         // This callback captures the final download URL after all redirects.
@@ -390,7 +396,7 @@ class OneDriveProvider extends CloudStorageProvider {
       );
       debugPrint("File successfully downloaded to $localPath");
       return localPath;
-    } catch (e, stackTrace) {
+    } catch (e) {
       debugPrint("Error during WebView download process");
       await headlessWebView.dispose();
       rethrow;
@@ -452,12 +458,11 @@ class OneDriveProvider extends CloudStorageProvider {
     try {
       debugPrint('Executing OneDrive operation: $operation');
       return await request();
-    }  on SocketException catch (e, stackTrace) {
+    } on SocketException catch (e) {
       debugPrint('No connection detected.');
       throw NoConnectionException(e.message);
-    }catch (e, stackTrace) {
-      debugPrint(
-        'Error during OneDrive operation: $operation');
+    } catch (e) {
+      debugPrint('Error during OneDrive operation: $operation');
       // If a 401 Unauthorized or invalid_grant error occurs, the token is likely expired.
       if (e.toString().contains('401') ||
           e.toString().contains('invalid_grant')) {

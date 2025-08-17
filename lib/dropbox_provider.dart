@@ -58,13 +58,13 @@ class DropboxProvider extends CloudStorageProvider {
       return null;
     }
     try {
-    final provider = DropboxProvider._create(
-        appKey: appKey, appSecret: appSecret, redirectUri: redirectUri);
-    // If interactive login is forced, clear any existing credentials.
-    if (forceInteractive) {
-      debugPrint('Forcing interactive login, clearing existing token.');
-      await provider._clearToken();
-    }
+      final provider = DropboxProvider._create(
+          appKey: appKey, appSecret: appSecret, redirectUri: redirectUri);
+      // If interactive login is forced, clear any existing credentials.
+      if (forceInteractive) {
+        debugPrint('Forcing interactive login, clearing existing token.');
+        await provider._clearToken();
+      }
       // Attempt to sign in silently with a stored token.
       DropboxToken? storedToken = await provider._getToken();
       if (storedToken != null) {
@@ -92,13 +92,12 @@ class DropboxProvider extends CloudStorageProvider {
       debugPrint(
           'Interactive Dropbox login successful for ${provider._account?.email}');
       return provider;
-    }  on SocketException catch (e, stackTrace) {
+    } on SocketException catch (e) {
       debugPrint('No connection detected.');
       throw NoConnectionException(e.message);
     } catch (error) {
       debugPrint(
-        'Error occurred during the Dropbox connect process. Clearing credentials.'
-      );
+          'Error occurred during the Dropbox connect process. Clearing credentials.');
       rethrow;
     }
   }
@@ -151,7 +150,8 @@ class DropboxProvider extends CloudStorageProvider {
       {required String remotePath, required String localPath}) {
     return _executeRequest(() async {
       final normalizedPath = _normalizePath(remotePath);
-      debugPrint('Downloading from Dropbox path: $normalizedPath to $localPath');
+      debugPrint(
+          'Downloading from Dropbox path: $normalizedPath to $localPath');
       final response = await _dio.post(
         'https://content.dropboxapi.com/2/files/download',
         options: Options(
@@ -374,10 +374,10 @@ class DropboxProvider extends CloudStorageProvider {
     _checkAuth();
     try {
       return await request();
-    }  on SocketException catch (e, stackTrace) {
+    } on SocketException catch (e) {
       debugPrint('No connection detected.');
       throw NoConnectionException(e.message);
-    } on DioException catch (e, stackTrace) {
+    } on DioException catch (e) {
       debugPrint('A DioException occurred in Dropbox request');
       if (e.error is SocketException) {
         throw NoConnectionException(e.message ?? e.toString());
@@ -386,7 +386,8 @@ class DropboxProvider extends CloudStorageProvider {
         throw NotFoundException(e.message ?? e.toString());
       }
       if (e.response?.statusCode == 401) {
-        debugPrint('Dropbox request failed with 401. Possible token invalidation.');
+        debugPrint(
+            'Dropbox request failed with 401. Possible token invalidation.');
         // The interceptor handles automatic refresh. If it still fails,
         // it indicates a more serious issue (e.g., revoked access).
         await logout(); // Force logout to clear bad state
@@ -399,7 +400,7 @@ class DropboxProvider extends CloudStorageProvider {
         }
       }
       rethrow;
-    } catch (e, stackTrace) {
+    } catch (e) {
       debugPrint('An unexpected error occurred in Dropbox request');
       rethrow;
     }
@@ -421,7 +422,8 @@ class DropboxProvider extends CloudStorageProvider {
       onError: (e, handler) async {
         // If a 401 Unauthorized error occurs, attempt to refresh the token.
         if (e.response?.statusCode == 401 && _token?.refreshToken != null) {
-          debugPrint('Token expired (401). Attempting to refresh Dropbox token.');
+          debugPrint(
+              'Token expired (401). Attempting to refresh Dropbox token.');
           try {
             await _refreshToken();
             await _saveToken(_token);
@@ -437,7 +439,7 @@ class DropboxProvider extends CloudStorageProvider {
               queryParameters: e.requestOptions.queryParameters,
             );
             return handler.resolve(response);
-          } catch (refreshError, stackTrace) {
+          } catch (refreshError) {
             debugPrint('Failed to refresh Dropbox token. Logging out.');
             await logout(); // Logout on catastrophic refresh failure.
             return handler.reject(e);
