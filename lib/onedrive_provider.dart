@@ -62,7 +62,9 @@ class OneDriveProvider extends CloudStorageProvider {
       // 2. If silent connection fails, fall back to interactive login via a WebView.
       debugPrint(
           "OneDriveProvider: Not connected, attempting interactive login...");
-      if (await provider.client.connect(context) == false) {
+      final bool connected = await provider.client.connect(context);
+      if (!context.mounted) return null; // Check if context is still valid
+      if (connected == false) {
         debugPrint(
             "OneDriveProvider: Interactive login failed or was cancelled.");
         return null; // User cancelled or login failed.
@@ -236,7 +238,7 @@ class OneDriveProvider extends CloudStorageProvider {
     try {
       // Check token validity by making a lightweight, authenticated API call.
       // A successful call means the token is valid.
-      final respone = await _executeRequest(
+      final _response = await _executeRequest(
         () => client.listFiles(
           '/',
           isAppFolder:
@@ -354,10 +356,10 @@ class OneDriveProvider extends CloudStorageProvider {
             completer.complete(finalUrl);
           }
         },
-        onLoadError: (controller, url, code, message) {
-          debugPrint("WebView error: Code $code, Message: $message");
+        onReceivedError: (controller, request, error) {
+          debugPrint("WebView error: Code ${error.type.name}, Message: ${error.description}");
           if (!completer.isCompleted) {
-            completer.completeError(Exception("WebView error: $message"));
+            completer.completeError(Exception("WebView error: ${error.description}"));
           }
         },
         // Handles cases where the WebView lands on an error page instead of triggering a download.

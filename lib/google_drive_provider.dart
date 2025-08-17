@@ -38,6 +38,12 @@ class GoogleDriveProvider extends CloudStorageProvider {
   ///
   /// This method handles the Google Sign-In flow. It will attempt to sign in
   /// silently first, unless [forceInteractive] is true.
+  /// [scopes] a list of additional Google API scopes to request.
+  /// The default scopes are `drive.DriveApi.driveAppdataScope` or
+  /// `drive.DriveApi.driveScope` depending on `MultiCloudStorage.cloudAccess`.
+  /// [serverClientId] The server client ID for requesting an ID token if you
+  /// need to authenticate to a backend server.
+  ///
   /// Returns a connected [GoogleDriveProvider] instance on success, or null on failure/cancellation.
   static Future<GoogleDriveProvider?> connect(
       {bool forceInteractive = false,
