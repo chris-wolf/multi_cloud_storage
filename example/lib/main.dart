@@ -50,8 +50,8 @@ class _CloudStorageExampleState extends State<CloudStorageExample> {
                   child: Text('Dropbox'),
                   onPressed: () async {
                     final provider = await MultiCloudStorage.connectToDropbox(
-                        appKey: 'eh6ej2fozvdi5xr',
-                        appSecret: 'oe6cdadvla68x5h',
+                        appKey: '',
+                        appSecret: '',
                         redirectUri:
                             'sample://auth.my.app'); // App registration required: https://www.dropbox.com/developers/apps
                     if (provider != null && context.mounted) {
