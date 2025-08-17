@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
-import 'package:googleapis_auth/googleapis_auth.dart';
+import 'package:googleapis_auth/googleapis_auth.dart' show AccessDeniedException;
 import 'package:http/retry.dart';
 import 'package:multi_cloud_storage/exceptions/no_connection_exception.dart';
 import 'package:path/path.dart';

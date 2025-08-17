@@ -25,6 +25,8 @@ dependencies:
   icloud_storage_sync: ^0.0.2
   dio_cookie_manager: ^3.3.0
   cookie_jar: ^4.0.8
+  flutter_inappwebview: ^6.1.5
+  googleapis_auth: ^2.0.0
 
 dev_dependencies:
   flutter_test:

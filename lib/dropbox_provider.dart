@@ -342,7 +342,6 @@ class DropboxProvider extends CloudStorageProvider {
         }
         rethrow;
       }
-      return null;
     });
   }
 
