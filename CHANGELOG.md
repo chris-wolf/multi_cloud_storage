@@ -1,3 +1,7 @@
+## 0.6.0
+* Add iCloud (only AppFolder possible)
+* Improve error handling in Google Drive
+
 ## 0.5.1
 * Fixes for iOS 
 
