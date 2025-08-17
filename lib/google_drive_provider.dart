@@ -38,6 +38,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
   ///
   /// This method handles the Google Sign-In flow. It will attempt to sign in
   /// silently first, unless [forceInteractive] is true.
+  ///
   /// [scopes] a list of additional Google API scopes to request.
   /// The default scopes are `drive.DriveApi.driveAppdataScope` or
   /// `drive.DriveApi.driveScope` depending on `MultiCloudStorage.cloudAccess`.
