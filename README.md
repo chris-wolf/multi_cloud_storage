@@ -165,6 +165,14 @@ flutter pub get
       <string>sample</string>
    </array>
 </dict>
+<dict>
+   <key>CFBundleURLName</key>
+   <string>dropbox_auth</string>
+   <key>CFBundleURLSchemes</key>
+   <array>
+      <string>sample</string>
+   </array>
+</dict>
 </array>
 ```
 

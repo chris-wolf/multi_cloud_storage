@@ -31,11 +31,27 @@
 	<key>CFBundleURLTypes</key>
     <array>
     <dict>
+           <key>CFBundleURLSchemes</key>
+           <array>
+              <string>sample</string>
+           </array>
+    </dict>
+    <dict>
+       <key>CFBundleTypeRole</key>
+       <string>Editor</string>
        <key>CFBundleURLSchemes</key>
        <array>
-          <string>sample</string>
+          <string>com.googleusercontent.apps.YOUR_REVERSED_CLIENT_ID</string>
        </array>
     </dict>
+    <dict>
+            <key>CFBundleURLName</key>
+            <string>dropbox_auth</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>YOUR_DROPBOX_REDIRECT_URL_SCHEME</string>
+            </array>
+        </dict>
     </array>
 </dict>
 </plist>
