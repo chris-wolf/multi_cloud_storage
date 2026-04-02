@@ -1,4 +1,7 @@
-## 0.6.0
+## 0.7.0
+* Added Windows support
+* Updated packages
+
 * Add iCloud (only AppFolder possible)
 * Improve error handling in Google Drive
 
