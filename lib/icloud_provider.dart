@@ -178,6 +178,7 @@ class ICloudProvider extends CloudStorageProvider {
     await _icloudSync.delete(
       containerId: _containerId,
       relativePath: path,
+      isDirectory: path.endsWith('/'),
     );
   }
 
