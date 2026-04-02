@@ -15,22 +15,18 @@ A Flutter plugin that provides a unified API for interacting with multiple cloud
 
 | Service     | Android | iOS | Mac | Windows | Linux |
 |-------------|:-------:|:---:|:----:|:-------:|:-----:|
-| OneDrive    | ✅      | ✅  | ⚠️   | ⚠️      | ❌    |
-| Google Drive| ✅      | ✅  | ⚠️   | ❌      | ❌    |
-| Dropbox     | ✅      | ✅  | ⚠️   | ⚠️      | ⚠️    |
-| iCloud      | ❌      | ✅  | ⚠️   | ⚠️      | ❌    |
-
+| OneDrive    | ✅      | ✅  | ✅   | ✅      |   ⚠️   |
+| Google Drive| ✅      | ✅  | ✅   | ✅      |   ⚠️   |
+| Dropbox     | ✅      | ✅  | ✅   | ✅      |   ⚠️   |
+| iCloud      | ❌      | ✅  | ✅   | ❌      |   ❌   |
 
 ⚠️ = Still untested, but should work with correct setup.
-
-
-
 
 ## Supported Functions
 | Functions                  | OneDrive | Google Drive | Dropbox | iCloud |
 |----------------------------|----------|--------------|---------|--------|
 | App Folder                 | ✅       | ✅           | ✅      | ✅     |
-| Full Access                | ✅       | ✅           | ✅      | ❌     |
+| Full Access                | ✅       | ⚠️           | ✅      | ❌     |
 | listFiles                  | ✅       | ✅           | ✅      | ✅     |
 | uploadFile                 | ✅       | ✅           | ✅      | ✅     |
 | downloadFile               | ✅       | ✅           | ✅      | ✅     |
@@ -44,6 +40,8 @@ A Flutter plugin that provides a unified API for interacting with multiple cloud
 | getShareTokenFromShareLink | ✅       | ✅           | ❌      | ❌     |
 | downloadFileByShareToken   | ✅       | ✅           | ❌      | ❌     |
 | uploadFileByShareToken     | ✅       | ✅           | ❌      | ❌     |
+
+⚠️ = Can access specific files picked by user outside of app folder. It's a bit tricky but check out [Flutter Google picker api example](https://github.com/chris-wolf/flutter_google_picker_api_example).
 
 ---
 
