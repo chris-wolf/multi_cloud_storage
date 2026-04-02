@@ -8,7 +8,6 @@ import 'package:multi_cloud_storage/icloud_provider.dart';
 import 'package:multi_cloud_storage/onedrive_provider.dart';
 
 import 'dropbox_provider.dart';
-import 'google_drive_provider.dart';
 
 class MultiCloudStorage {
   static CloudAccessType cloudAccess = CloudAccessType.appStorage;

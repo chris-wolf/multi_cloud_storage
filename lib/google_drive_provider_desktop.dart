@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_sign_in_all_platforms/google_sign_in_all_platforms.dart'
     as all_platforms;
@@ -97,7 +96,7 @@ class GoogleDriveProviderDesktop extends GoogleDriveProvider {
         retries: 3,
         when: (response) => {500, 502, 503, 504}.contains(response.statusCode),
         onRetry: (request, response, retryCount) => debugPrint(
-            'Retrying request to ${request?.url} (Retry #$retryCount)'),
+            'Retrying request to ${request.url} (Retry #$retryCount)'),
       );
 
       // Create or update the singleton instance with the authenticated client.
