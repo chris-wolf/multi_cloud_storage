@@ -18,6 +18,6 @@ dependencies:
   icloud_storage_sync: ^0.0.4
   path: ^1.9.1
 
-dependency_overrides:
-  multi_cloud_storage_platform_interface:
-    path: ../multi_cloud_storage_platform_interface
+# dependency_overrides:
+#   multi_cloud_storage_platform_interface:
+#     path: ../multi_cloud_storage_platform_interface
