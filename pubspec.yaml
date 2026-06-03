@@ -44,8 +44,8 @@ screenshots:
   - description: 'Example cloud explorer'
     path: example/screenshots/Example_cloud_storage_explorer.jpg
 
-dependency_overrides:
-  multi_cloud_storage_platform_interface:
-    path: ./multi_cloud_storage_platform_interface
+#dependency_overrides:
+    #  multi_cloud_storage_platform_interface:
+#    path: ./multi_cloud_storage_platform_interface
 
 
