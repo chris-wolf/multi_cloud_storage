@@ -1,8 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:multi_cloud_storage/cloud_storage_provider.dart';
 import 'package:multi_cloud_storage/multi_cloud_storage.dart';
+import 'package:multi_cloud_storage_icloud/multi_cloud_storage_icloud.dart';
 
 import 'CloudStorageExplorer.dart';
 
@@ -39,7 +39,7 @@ class _CloudStorageExampleState extends State<CloudStorageExample> {
                   ElevatedButton(
                     child: Text('iCloud'),
                     onPressed: () async {
-                      final provider = await MultiCloudStorage.connectToIcloud(
+                      final provider = await ICloudProvider.connect(
                           containerId: '');
                       if (provider != null && context.mounted) {
                         openExplorer(context, provider);

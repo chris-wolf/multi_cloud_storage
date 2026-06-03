@@ -10,10 +10,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:googleapis_auth/googleapis_auth.dart' show AccessDeniedException;
 import 'package:http/retry.dart';
-import 'package:multi_cloud_storage/exceptions/no_connection_exception.dart';
 import 'package:path/path.dart';
-import 'cloud_storage_provider.dart';
-import 'exceptions/not_found_exception.dart';
 import 'multi_cloud_storage.dart';
 
 class GoogleDriveProvider extends CloudStorageProvider {

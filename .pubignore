@@ -1,3 +1,6 @@
 example/pubspec.lock
 multi_cloud_storage.iml
 pubspec.lock
+build/
+multi_cloud_storage_icloud/
+multi_cloud_storage_platform_interface/

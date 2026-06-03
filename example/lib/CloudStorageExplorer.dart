@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:multi_cloud_storage/cloud_storage_provider.dart';
+import 'package:multi_cloud_storage/multi_cloud_storage.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path/path.dart' as path;
 import 'package:permission_handler/permission_handler.dart';

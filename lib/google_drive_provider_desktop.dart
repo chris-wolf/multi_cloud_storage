@@ -10,7 +10,7 @@ import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:http/http.dart' as http;
 import 'package:http/http.dart' as client;
 import 'package:http/retry.dart';
-import 'package:multi_cloud_storage/exceptions/no_connection_exception.dart';
+import 'package:multi_cloud_storage_platform_interface/exceptions/no_connection_exception.dart';
 import 'google_drive_provider.dart';
 
 class GoogleDriveProviderDesktop extends GoogleDriveProvider {

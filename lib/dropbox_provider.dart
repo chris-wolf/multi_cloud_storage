@@ -11,9 +11,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path/path.dart' as p;
 import 'package:url_launcher/url_launcher.dart';
 
-import 'cloud_storage_provider.dart';
-import 'exceptions/no_connection_exception.dart';
-import 'exceptions/not_found_exception.dart';
+import 'package:multi_cloud_storage_platform_interface/multi_cloud_storage_platform_interface.dart';
 
 class DropboxProvider extends CloudStorageProvider {
   // --- Configuration Properties ---

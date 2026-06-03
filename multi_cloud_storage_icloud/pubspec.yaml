@@ -1,0 +1,23 @@
+name: multi_cloud_storage_icloud
+description: iCloud storage provider implementation for multi_cloud_storage.
+version: 0.1.0
+homepage: https://github.com/chris-wolf/multi_cloud_storage
+
+platforms:
+  ios:
+  macos:
+
+environment:
+  sdk: ">=2.19.0 <4.0.0"
+  flutter: ">=3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  multi_cloud_storage_platform_interface: ^0.1.0
+  icloud_storage_sync: ^0.0.4
+  path: ^1.9.1
+
+dependency_overrides:
+  multi_cloud_storage_platform_interface:
+    path: ../multi_cloud_storage_platform_interface

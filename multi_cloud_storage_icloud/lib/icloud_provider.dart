@@ -7,9 +7,7 @@ import 'package:icloud_storage_sync/icloud_storage_sync.dart';
 import 'package:icloud_storage_sync/models/icloud_file.dart';
 import 'package:path/path.dart' as p;
 
-import 'cloud_storage_provider.dart';
-import 'exceptions/no_connection_exception.dart';
-import 'exceptions/not_found_exception.dart';
+import 'package:multi_cloud_storage_platform_interface/multi_cloud_storage_platform_interface.dart';
 
 class ICloudProvider extends CloudStorageProvider {
   late final IcloudStorageSync _icloudSync;
