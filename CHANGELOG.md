@@ -1,3 +1,6 @@
+## 1.0.0
+* Splitted package into platform_interface and icloud
+
 ## 0.7.0
 * Added Windows support
 * Updated packages
