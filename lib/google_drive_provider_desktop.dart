@@ -8,20 +8,19 @@ import 'package:google_sign_in_all_platforms/google_sign_in_all_platforms.dart'
     as all_platforms;
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:http/http.dart' as http;
-import 'package:http/http.dart' as client;
 import 'package:http/retry.dart';
 import 'package:multi_cloud_storage_platform_interface/exceptions/no_connection_exception.dart';
 import 'google_drive_provider.dart';
 
 class GoogleDriveProviderDesktop extends GoogleDriveProvider {
   /// The authenticated Google Drive API client.
-  static GoogleDriveProviderDesktop? _instance;
   static all_platforms.GoogleSignIn? _googleSignIn;
 
   // This one is correct because it explicitly calls super.internal()
   GoogleDriveProviderDesktop.internal() : super.internal();
 
-  static GoogleDriveProviderDesktop? get instance => _instance;
+  static GoogleDriveProviderDesktop? get instance =>
+      GoogleDriveProvider.internalInstance as GoogleDriveProviderDesktop?;
   String? _accessToken;
 
   /// Connects to Google Drive, authenticating the user.
@@ -46,8 +45,8 @@ class GoogleDriveProviderDesktop extends GoogleDriveProvider {
   }) async {
     debugPrint("connect Google Drive,  forceInteractive: $forceInteractive");
     // Return existing instance if already connected and not forcing a new interactive session.
-    if (_instance != null && _instance!.isAuthenticated && !forceInteractive) {
-      return _instance;
+    if (instance != null && instance!.isAuthenticated && !forceInteractive) {
+      return instance;
     }
     if (scopes != null) {
       GoogleDriveProvider.scopes = scopes;
@@ -100,13 +99,13 @@ class GoogleDriveProviderDesktop extends GoogleDriveProvider {
       );
 
       // Create or update the singleton instance with the authenticated client.
-      final provider = _instance ?? GoogleDriveProviderDesktop.internal();
+      final provider = instance ?? GoogleDriveProviderDesktop.internal();
       provider.driveApi = drive.DriveApi(retryClient);
       provider.isAuthenticated = true;
       provider._accessToken = credentials.accessToken;
-      _instance = provider;
+      GoogleDriveProvider.internalInstance = provider;
       debugPrint('Google Drive user signed in successfully.');
-      return _instance;
+      return instance;
     } on SocketException catch (e) {
       debugPrint(
           'No internet connection during Google Drive sign-in: ${e.message}');
@@ -126,16 +125,28 @@ class GoogleDriveProviderDesktop extends GoogleDriveProvider {
   @override
   Future<String?> loggedInUserDisplayName() async {
     try {
-      final response = await client.get(
-        Uri.parse('https://www.googleapis.com/oauth2/v3/userinfo'),
-      );
+      final about = await driveApi.about.get($fields: 'user(displayName)');
+      if (about.user?.displayName != null) {
+        return about.user!.displayName;
+      }
+    } catch (e) {
+      debugPrint('Error fetching user info from driveApi: $e');
+    }
+    try {
+      final token = await getAccessToken();
+      if (token != null) {
+        final response = await http.get(
+          Uri.parse('https://www.googleapis.com/oauth2/v3/userinfo'),
+          headers: {'Authorization': 'Bearer $token'},
+        );
 
-      if (response.statusCode == 200) {
-        final userInfo = jsonDecode(response.body);
-        return userInfo['name'];
-      } else {
-        debugPrint(
-            'Failed to fetch user info. Status: ${response.statusCode}, Body: ${response.body}');
+        if (response.statusCode == 200) {
+          final userInfo = jsonDecode(response.body);
+          return userInfo['name'];
+        } else {
+          debugPrint(
+              'Failed to fetch user info. Status: ${response.statusCode}, Body: ${response.body}');
+        }
       }
     } catch (e) {
       debugPrint('Error fetching user info: $e');
@@ -152,9 +163,9 @@ class GoogleDriveProviderDesktop extends GoogleDriveProvider {
     } finally {
       // Clear all state regardless of success or failure.
       _googleSignIn = null;
-      if (_instance != null) {
-        _instance!.isAuthenticated = false;
-        _instance = null;
+      if (instance != null) {
+        instance!.isAuthenticated = false;
+        GoogleDriveProvider.internalInstance = null;
       }
       debugPrint('User signed out from Google Drive.');
     }

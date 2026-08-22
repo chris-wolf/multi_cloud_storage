@@ -20,7 +20,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
 
   // Singleton instance backing fields.
   static GoogleSignIn? googleSignIn;
-  static GoogleDriveProvider? _instance;
+  static GoogleDriveProvider? internalInstance;
   static List<String> scopes = [
     MultiCloudStorage.cloudAccess == CloudAccessType.appStorage
         ? drive.DriveApi.driveAppdataScope
@@ -29,7 +29,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
 
   GoogleDriveProvider.internal();
 
-  static GoogleDriveProvider? get instance => _instance;
+  static GoogleDriveProvider? get instance => internalInstance;
 
   /// Connects to Google Drive, authenticating the user.
   ///
@@ -52,8 +52,8 @@ class GoogleDriveProvider extends CloudStorageProvider {
   }) async {
     debugPrint("connect Google Drive,  forceInteractive: $forceInteractive");
     // Return existing instance if already connected and not forcing a new interactive session.
-    if (_instance != null && _instance!.isAuthenticated && !forceInteractive) {
-      return _instance;
+    if (internalInstance != null && internalInstance!.isAuthenticated && !forceInteractive) {
+      return internalInstance;
     }
     if (scopes != null) {
       GoogleDriveProvider.scopes = scopes;
@@ -97,13 +97,13 @@ class GoogleDriveProvider extends CloudStorageProvider {
             'Retrying request to ${request.url} (Retry #$retryCount)'),
       );
       // Create or update the singleton instance with the authenticated client.
-      final provider = _instance ?? GoogleDriveProvider.internal();
+      final provider = internalInstance ?? GoogleDriveProvider.internal();
       provider.driveApi = drive.DriveApi(retryClient);
       provider.isAuthenticated = true;
-      _instance = provider;
+      internalInstance = provider;
       debugPrint(
           'Google Drive user signed in: ID=${account.id}, Email=${account.email}');
-      return _instance;
+      return internalInstance;
     } on SocketException catch (e) {
       debugPrint('No internet connection during Google Drive sign-in.');
       throw NoConnectionException(e.message);
@@ -405,9 +405,9 @@ class GoogleDriveProvider extends CloudStorageProvider {
     } finally {
       // Clear all state regardless of success or failure.
       googleSignIn = null;
-      if (_instance != null) {
-        _instance!.isAuthenticated = false;
-        _instance = null;
+      if (internalInstance != null) {
+        internalInstance!.isAuthenticated = false;
+        internalInstance = null;
       }
       debugPrint('User signed out from Google Drive.');
     }
@@ -448,7 +448,7 @@ class GoogleDriveProvider extends CloudStorageProvider {
 
   /// Throws an exception if the provider is not authenticated.
   void _checkAuth() {
-    if (!isAuthenticated || _instance == null) {
+    if (!isAuthenticated || internalInstance == null) {
       throw Exception(
           'GoogleDriveProvider: Not authenticated. Call connect() first.');
     }

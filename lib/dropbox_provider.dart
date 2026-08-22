@@ -6,9 +6,12 @@ import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import 'package:path/path.dart' as p;
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:multi_cloud_storage_platform_interface/multi_cloud_storage_platform_interface.dart';
 
@@ -47,6 +50,7 @@ class DropboxProvider extends CloudStorageProvider {
     required String appSecret,
     required String redirectUri,
     bool forceInteractive = false,
+    BuildContext? context,
   }) async {
     debugPrint('connect Dropbox, forceInteractive: $forceInteractive');
     if (appKey.isEmpty || appSecret.isEmpty || redirectUri.isEmpty) {
@@ -79,7 +83,8 @@ class DropboxProvider extends CloudStorageProvider {
       }
       // If no token exists, start the interactive login flow.
       debugPrint('No valid token found. Starting interactive Dropbox login.');
-      final authCode = await provider._getAuthCodeViaInteractiveFlow();
+      final authCode =
+          await provider._getAuthCodeViaInteractiveFlow(context: context);
       if (authCode == null) {
         debugPrint('Interactive Dropbox login cancelled by user.');
         return null;
@@ -494,9 +499,53 @@ class DropboxProvider extends CloudStorageProvider {
     debugPrint('Successfully fetched user: ${_account?.email}');
   }
 
-  /// Manages the interactive OAuth2 flow using FlutterWebAuth2.
-  Future<String?> _getAuthCodeViaInteractiveFlow() async {
+  /// Manages the interactive OAuth2 flow using local loopback server (for localhost URIs), InAppWebView (for desktop modal), or FlutterWebAuth2.
+  Future<String?> _getAuthCodeViaInteractiveFlow({BuildContext? context}) async {
+    final parsedRedirectUri = Uri.parse(_redirectUri);
+
+    // 1. If redirect URI is localhost / 127.0.0.1, use the standard local loopback server with system browser
+    if (parsedRedirectUri.host == 'localhost' ||
+        parsedRedirectUri.host == '127.0.0.1') {
+      final port = parsedRedirectUri.hasPort ? parsedRedirectUri.port : 8000;
+      return await _getAuthCodeViaLoopbackServer(port);
+    }
+
     final authUrl = _getAuthorizationUrl();
+
+    // 2. If desktop with custom scheme and context, try InAppWebView modal
+    if (context != null && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+      try {
+        debugPrint('Launching Dropbox authentication via InAppWebView modal: $authUrl');
+        final result = await Navigator.of(context).push<Map<String, String?>>(
+          MaterialPageRoute(
+            builder: (_) => DropboxAuthScreen(
+              initialUri: Uri.parse(authUrl),
+              redirectUri: _redirectUri,
+            ),
+            fullscreenDialog: true,
+          ),
+        );
+
+        if (result != null) {
+          final code = result['code'];
+          if (code != null) {
+            debugPrint('Received authorization code from Dropbox in-app WebView.');
+            return code;
+          } else {
+            final error = result['error_description'] ?? result['error'] ?? 'Unknown error';
+            debugPrint('Dropbox auth failed from in-app WebView: $error');
+            return null;
+          }
+        } else {
+          debugPrint('Dropbox in-app WebView auth cancelled by user.');
+          return null;
+        }
+      } catch (e) {
+        debugPrint('Dropbox in-app WebView error: $e. Falling back to FlutterWebAuth2.');
+      }
+    }
+
+    // 3. Fallback to FlutterWebAuth2 for mobile platforms (iOS / Android)
     final callbackScheme = Uri.parse(_redirectUri).scheme;
     try {
       debugPrint(
@@ -518,6 +567,82 @@ class DropboxProvider extends CloudStorageProvider {
       }
     } catch (e) {
       debugPrint('Dropbox interactive auth cancelled or failed: $e');
+      return null;
+    }
+  }
+
+  /// Listens on a local loopback HTTP server (e.g. http://localhost:8000/auth), launches the system browser,
+  /// and captures the authorization code when Dropbox redirects back.
+  Future<String?> _getAuthCodeViaLoopbackServer(int port) async {
+    HttpServer? server;
+    try {
+      server = await HttpServer.bind(InternetAddress.loopbackIPv4, port);
+      debugPrint('Dropbox loopback server listening on port $port');
+
+      final authUrl = _getAuthorizationUrl();
+      debugPrint('Launching Dropbox auth in system browser: $authUrl');
+      await launchUrl(Uri.parse(authUrl), mode: LaunchMode.externalApplication);
+
+      final request = await server.first.timeout(const Duration(minutes: 5));
+      final queryParams = request.uri.queryParameters;
+      final code = queryParams['code'];
+      final error = queryParams['error_description'] ?? queryParams['error'];
+
+      request.response.headers.contentType = ContentType.html;
+      if (code != null) {
+        request.response.write('''<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Connected to Dropbox</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; padding: 60px 20px; background: #0f172a; color: #f8fafc; }
+    .card { background: #1e293b; max-width: 460px; margin: auto; padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+    h1 { color: #6366f1; margin-bottom: 12px; font-size: 24px; }
+    p { color: #94a3b8; font-size: 16px; margin: 0; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>✅ Connected to Dropbox</h1>
+    <p>You can close this window and return to Flashcards.</p>
+  </div>
+</body>
+</html>''');
+      } else {
+        request.response.write('''<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Authentication Failed</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; padding: 60px 20px; background: #0f172a; color: #f8fafc; }
+    .card { background: #1e293b; max-width: 460px; margin: auto; padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+    h1 { color: #ef4444; margin-bottom: 12px; font-size: 24px; }
+    p { color: #94a3b8; font-size: 16px; margin: 0; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Authentication Failed</h1>
+    <p>\${error ?? 'Login was cancelled or failed.'}</p>
+  </div>
+</body>
+</html>''');
+      }
+      await request.response.close();
+      await server.close(force: true);
+
+      if (code != null) {
+        debugPrint('Received Dropbox authorization code via loopback server.');
+        return code;
+      } else {
+        debugPrint('Dropbox auth failed via loopback server: $error');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('Dropbox loopback server error: $e');
+      await server?.close(force: true);
       return null;
     }
   }
@@ -715,3 +840,95 @@ class DropboxAccount {
     );
   }
 }
+
+/// In-App WebView screen for Dropbox OAuth 2.0 PKCE authentication.
+class DropboxAuthScreen extends StatefulWidget {
+  final Uri initialUri;
+  final String redirectUri;
+
+  const DropboxAuthScreen({
+    super.key,
+    required this.initialUri,
+    required this.redirectUri,
+  });
+
+  @override
+  State<DropboxAuthScreen> createState() => _DropboxAuthScreenState();
+}
+
+class _DropboxAuthScreenState extends State<DropboxAuthScreen> {
+  bool _isLoading = true;
+  bool _hasResult = false;
+
+  void _checkRedirect(WebUri? uri) {
+    if (_hasResult || uri == null) return;
+    final uriStr = uri.toString();
+    if (uriStr.startsWith(widget.redirectUri)) {
+      _hasResult = true;
+      final parsed = Uri.parse(uriStr);
+      final code = parsed.queryParameters['code'];
+      final error = parsed.queryParameters['error'];
+      final errorDesc = parsed.queryParameters['error_description'];
+      if (mounted) {
+        Navigator.of(context).pop<Map<String, String?>>({
+          'code': code,
+          'error': error,
+          'error_description': errorDesc,
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Sign in to Dropbox'),
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () {
+            if (!_hasResult && mounted) {
+              Navigator.of(context).pop<Map<String, String?>>(null);
+            }
+          },
+        ),
+        bottom: _isLoading
+            ? const PreferredSize(
+                preferredSize: Size.fromHeight(4.0),
+                child: LinearProgressIndicator(),
+              )
+            : null,
+      ),
+      body: InAppWebView(
+        initialUrlRequest: URLRequest(url: WebUri.uri(widget.initialUri)),
+        initialSettings: InAppWebViewSettings(
+          useShouldOverrideUrlLoading: true,
+          useHybridComposition: true,
+          transparentBackground: false,
+        ),
+        onLoadStart: (controller, url) {
+          if (mounted) setState(() => _isLoading = true);
+          _checkRedirect(url);
+        },
+        onLoadStop: (controller, url) {
+          if (mounted) setState(() => _isLoading = false);
+          _checkRedirect(url);
+        },
+        onReceivedError: (controller, request, error) {
+          if (mounted) setState(() => _isLoading = false);
+          debugPrint(
+              '[DropboxAuthScreen] WebView error: ${error.description}');
+        },
+        shouldOverrideUrlLoading: (controller, navigationAction) async {
+          final uri = navigationAction.request.url;
+          if (uri != null && uri.toString().startsWith(widget.redirectUri)) {
+            _checkRedirect(uri);
+            return NavigationActionPolicy.CANCEL;
+          }
+          return NavigationActionPolicy.ALLOW;
+        },
+      ),
+    );
+  }
+}
+

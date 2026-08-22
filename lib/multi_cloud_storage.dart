@@ -19,12 +19,14 @@ class MultiCloudStorage {
           {required String appKey,
           required String appSecret,
           required String redirectUri,
-          bool forceInteractive = false}) =>
+          bool forceInteractive = false,
+          BuildContext? context}) =>
       DropboxProvider.connect(
           appKey: appKey,
           appSecret: appSecret,
           redirectUri: redirectUri,
-          forceInteractive: forceInteractive);
+          forceInteractive: forceInteractive,
+          context: context);
 
   static Future<CloudStorageProvider?> connectToGoogleDrive(
           {bool forceInteractive = false,
